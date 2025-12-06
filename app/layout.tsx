@@ -9,8 +9,21 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: "VFP Trading Strategy Dashboard",
+  description: "Advanced trading strategy analytics dashboard tracking performance across multiple timeframes and configurations. Monitor PnL, win rates, and profit factors in real-time.",
+  openGraph: {
+    title: "VFP Trading Strategy Dashboard",
+    description: "Advanced trading strategy analytics dashboard tracking performance across multiple timeframes and configurations. Monitor PnL, win rates, and profit factors in real-time.",
+    url: defaultUrl,
+    siteName: "VFP Dashboard",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VFP Trading Strategy Dashboard",
+    description: "Advanced trading strategy analytics dashboard tracking performance across multiple timeframes and configurations.",
+  },
 };
 
 const geistSans = Geist({
