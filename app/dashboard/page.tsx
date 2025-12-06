@@ -6,7 +6,6 @@ import { PerformanceMetrics } from "@/components/dashboard/performance-metrics";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, TrendingUp, BarChart3 } from "lucide-react";
-import { DashboardNav } from "@/components/dashboard/nav";
 
 async function DashboardContent() {
   const [timeframeStats, topPerformers, allResults, recentResults] = await Promise.all([
@@ -147,24 +146,19 @@ async function DashboardContent() {
   );
 }
 
-export default function Home() {
+export default function DashboardPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <DashboardNav />
-      <main className="flex-1">
-        <div className="container mx-auto py-8 px-4">
-          <Suspense fallback={
-            <div className="flex items-center justify-center min-h-screen">
-              <div className="text-center">
-                <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
-                <p className="text-muted-foreground">Loading dashboard data...</p>
-              </div>
-            </div>
-          }>
-            <DashboardContent />
-          </Suspense>
+    <div className="container mx-auto py-8 px-4">
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading dashboard data...</p>
+          </div>
         </div>
-      </main>
+      }>
+        <DashboardContent />
+      </Suspense>
     </div>
   );
 }
