@@ -56,8 +56,9 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
     return parseFloat(value.replace(/[^0-9.-]/g, '')) || 0;
   };
 
+  const STARTING_CAPITAL = 100000; // Starting capital in dollars
   const pnl = parsePercentage(strategy.pnl);
-  const netProfit = parseNumber(strategy.net_profit_all);
+  const netProfit = STARTING_CAPITAL * (pnl / 100); // Calculate net profit from PnL %
 
   return (
     <div className="min-h-screen flex flex-col">
