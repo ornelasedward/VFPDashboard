@@ -34,7 +34,7 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
   const profitableStrategies = results.filter(r => parsePercentage(r.pnl) > 0).length;
   const profitablePercentage = (profitableStrategies / totalRuns) * 100;
 
-  const STARTING_CAPITAL = 10000; // Starting capital in dollars
+  const STARTING_CAPITAL = 100000; // Starting capital in dollars
   
   const bestPnl = Math.max(...results.map(r => parsePercentage(r.pnl)));
   const bestWinRate = Math.max(...results.map(r => parsePercentage(r.win_rate)));
