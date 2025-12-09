@@ -210,9 +210,9 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
                         <p className="text-sm font-medium text-muted-foreground">Smoothing Type</p>
                         <p className="text-lg font-semibold">{strategy.smoothing_type}</p>
                       </div>
-                      <div>
+                      <div className="md:col-span-2 lg:col-span-3">
                         <p className="text-sm font-medium text-muted-foreground">Resolutions</p>
-                        <p className="text-lg font-semibold">{strategy.resolutions}</p>
+                        <p className="text-lg font-semibold break-words">{strategy.resolutions}</p>
                       </div>
                     </div>
                   </CardContent>
