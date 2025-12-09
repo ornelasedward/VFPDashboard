@@ -229,7 +229,7 @@ export async function getTopPerformers(limit: number = 10): Promise<StrategyResu
 
 export async function getResultsByTimeframe(timeframe: string): Promise<StrategyResult[]> {
   const supabase = await createClient();
-  const tableName = `btc_usdt_${timeframe}_results`;
+  const tableName = timeframe === 'fixed' ? 'btc_usdt_fixed_settings' : `btc_usdt_${timeframe}_results`;
   
   // Fetch all results using pagination
   const allResults: any[] = [];
@@ -264,6 +264,23 @@ export async function getResultsByTimeframe(timeframe: string): Promise<Strategy
   console.log(`✅ Loaded ${allResults.length} results from ${tableName}`);
   
   return allResults as StrategyResult[];
+}
+
+export async function getTopPerformersByTimeframe(timeframe: string, limit: number = 20): Promise<StrategyResult[]> {
+  const allResults = await getResultsByTimeframe(timeframe);
+  
+  // Sort by profit factor (descending) and return top performers
+  const sorted = allResults
+    .sort((a, b) => {
+      const pfA = parseFloat(a.profit_factor || '0');
+      const pfB = parseFloat(b.profit_factor || '0');
+      return pfB - pfA;
+    })
+    .slice(0, limit);
+  
+  console.log(`🎯 Returning top ${sorted.length} performers for ${timeframe} by profit factor`);
+  
+  return sorted;
 }
 
 export async function getAllResults(): Promise<StrategyResult[]> {

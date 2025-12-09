@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getTimeframeStats, getTopPerformers, getRecentResults, getAllResults } from "@/lib/supabase/queries";
+import { getTimeframeStats, getTopPerformers, getAllResults, getTopPerformersByTimeframe } from "@/lib/supabase/queries";
 import { TimeframeOverview } from "@/components/dashboard/timeframe-overview";
 import { TopPerformersTable } from "@/components/dashboard/top-performers-table";
 import { PerformanceMetrics } from "@/components/dashboard/performance-metrics";
@@ -9,12 +9,19 @@ import { Activity, TrendingUp, BarChart3 } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/nav";
 
 async function DashboardContent() {
-  const [timeframeStats, topPerformers, allResults, recentResults] = await Promise.all([
+  const [timeframeStats, topPerformers, allResults] = await Promise.all([
     getTimeframeStats(),
     getTopPerformers(20),
     getAllResults(),
-    getRecentResults(100),
   ]);
+  
+  // Fetch top 20 performers for each timeframe
+  const timeframeTopPerformers = await Promise.all(
+    ['2h', '3h', '4h', '5h', '6h', 'fixed'].map(async (tf) => ({
+      timeframe: tf,
+      results: await getTopPerformersByTimeframe(tf, 20)
+    }))
+  );
 
   return (
     <div className="space-y-8">
@@ -72,9 +79,9 @@ async function DashboardContent() {
       <section>
         <Card>
           <CardHeader>
-            <CardTitle>Detailed Results by Timeframe</CardTitle>
+            <CardTitle>Top 20 Performers by Timeframe</CardTitle>
             <CardDescription>
-              View all strategy runs for each timeframe
+              Best performing strategies sorted by profit factor (highest to lowest)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -88,58 +95,11 @@ async function DashboardContent() {
                 <TabsTrigger value="fixed">Fixed</TabsTrigger>
               </TabsList>
               
-              {['2h', '3h', '4h', '5h', '6h', 'fixed'].map((tf) => {
-                const tfResults = recentResults.filter(r => r.chart_tf === tf);
-                const tfStats = timeframeStats.find(s => s.timeframe === tf);
-                
-                return (
-                  <TabsContent key={tf} value={tf} className="space-y-4">
-                    {tfStats && (
-                      <div className="grid gap-4 md:grid-cols-4">
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Total Runs</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{tfStats.total_runs}</div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Best PnL</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className={`text-2xl font-bold ${tfStats.best_pnl > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {tfStats.best_pnl.toFixed(2)}%
-                            </div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Avg Win Rate</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{tfStats.avg_win_rate.toFixed(1)}%</div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Avg Profit Factor</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{tfStats.avg_profit_factor.toFixed(2)}</div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    )}
-                    
-                    <TopPerformersTable results={tfResults.slice(0, 10)} />
-                  </TabsContent>
-                );
-              })}
+              {timeframeTopPerformers.map(({ timeframe, results }) => (
+                <TabsContent key={timeframe} value={timeframe} className="space-y-4">
+                  <TopPerformersTable results={results} />
+                </TabsContent>
+              ))}
             </Tabs>
           </CardContent>
         </Card>
