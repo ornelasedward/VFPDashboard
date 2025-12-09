@@ -39,7 +39,12 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
   const bestPnl = Math.max(...results.map(r => parsePercentage(r.pnl)));
   const bestWinRate = Math.max(...results.map(r => parsePercentage(r.win_rate)));
   const bestProfitFactor = Math.max(...results.map(r => parseNumber(r.profit_factor)));
-  const bestMaxDD = Math.min(...results.map(r => Math.abs(parsePercentage(r.max_dd))));
+  
+  // Find lowest max drawdown (excluding zero/invalid values)
+  const validDrawdowns = results
+    .map(r => Math.abs(parsePercentage(r.max_dd)))
+    .filter(dd => dd > 0); // Filter out zero values
+  const bestMaxDD = validDrawdowns.length > 0 ? Math.min(...validDrawdowns) : 0;
   
   // Calculate dollar PnL based on percentage PnL and starting capital
   const bestDollarPnl = Math.max(...results.map(r => {
