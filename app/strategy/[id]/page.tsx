@@ -1,9 +1,8 @@
-import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { StrategyResult } from "@/lib/supabase/queries";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardNav } from "@/components/dashboard/nav";
-import { Activity, ArrowLeft, TrendingUp, Target, BarChart3, Calendar, Settings, DollarSign } from "lucide-react";
+import { ArrowLeft, TrendingUp, Target, BarChart3, Calendar, Settings } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -38,8 +37,9 @@ async function getStrategyById(id: string): Promise<StrategyResult | null> {
   return null;
 }
 
-export default async function StrategyDetailPage({ params }: { params: { id: string } }) {
-  const strategy = await getStrategyById(params.id);
+export default async function StrategyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const strategy = await getStrategyById(id);
   
   if (!strategy) {
     notFound();
@@ -64,12 +64,7 @@ export default async function StrategyDetailPage({ params }: { params: { id: str
       <DashboardNav />
       <main className="flex-1">
         <div className="container mx-auto py-8 px-4">
-          <Suspense fallback={
-            <div className="flex items-center justify-center min-h-screen">
-              <Activity className="h-8 w-8 animate-spin" />
-            </div>
-          }>
-            <div className="space-y-6">
+          <div className="space-y-6">
               {/* Header with Back Button */}
               <div className="flex items-center gap-4">
                 <Link 
@@ -338,8 +333,7 @@ export default async function StrategyDetailPage({ params }: { params: { id: str
                   </CardContent>
                 </Card>
               </section>
-            </div>
-          </Suspense>
+          </div>
         </div>
       </main>
     </div>
