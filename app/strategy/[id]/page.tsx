@@ -7,6 +7,9 @@ import { Activity, ArrowLeft, TrendingUp, Target, BarChart3, Calendar, Settings,
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 async function getStrategyById(id: string): Promise<StrategyResult | null> {
   const supabase = await createClient();
   
