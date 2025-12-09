@@ -95,11 +95,27 @@ async function DashboardContent() {
                 <TabsTrigger value="fixed">Fixed</TabsTrigger>
               </TabsList>
               
-              {timeframeTopPerformers.map(({ timeframe, results }) => (
-                <TabsContent key={timeframe} value={timeframe} className="space-y-4">
-                  <TopPerformersTable results={results} />
-                </TabsContent>
-              ))}
+              {timeframeTopPerformers.map(({ timeframe, results }) => {
+                const tfStats = timeframeStats.find(s => s.timeframe === timeframe);
+                
+                return (
+                  <TabsContent key={timeframe} value={timeframe} className="space-y-4">
+                    {tfStats && (
+                      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Strategy Runs</p>
+                          <p className="text-2xl font-bold">{tfStats.total_runs.toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Showing Top 20 by Profit Factor</p>
+                          <p className="text-lg font-semibold">{results.length} strategies</p>
+                        </div>
+                      </div>
+                    )}
+                    <TopPerformersTable results={results} />
+                  </TabsContent>
+                );
+              })}
             </Tabs>
           </CardContent>
         </Card>
