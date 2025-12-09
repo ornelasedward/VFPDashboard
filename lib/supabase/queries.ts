@@ -42,8 +42,6 @@ export interface TimeframeStats {
   total_runs: number;
   best_pnl: number;
   best_config: StrategyResult | null;
-  avg_win_rate: number;
-  avg_profit_factor: number;
 }
 
 // Helper to parse percentage strings like "45.2%" to numbers
@@ -129,45 +127,28 @@ export async function getTimeframeStats(): Promise<TimeframeStats[]> {
     
     console.log(`✅ Loaded ${allResults.length} results from ${tableName}`);
     
-    // Calculate stats
+    // Calculate stats - find best performer by profit factor
     const total_runs = allResults.length;
     
-    // Find best PnL
-    let bestResult: StrategyResult | null = null;
-    let bestPnl = -Infinity;
-    
-    let totalWinRate = 0;
-    let totalProfitFactor = 0;
-    let validWinRateCount = 0;
-    let validProfitFactorCount = 0;
+    // Find best performer by profit factor
+    let bestResult: any = null;
+    let bestProfitFactor = -Infinity;
     
     allResults.forEach((result: any) => {
-      const pnl = parsePercentage(result.pnl);
-      if (pnl > bestPnl) {
-        bestPnl = pnl;
-        bestResult = result as StrategyResult;
-      }
-      
-      const winRate = parsePercentage(result.win_rate);
-      if (winRate > 0) {
-        totalWinRate += winRate;
-        validWinRateCount++;
-      }
-      
       const profitFactor = parseFloat(result.profit_factor || '0');
-      if (profitFactor > 0) {
-        totalProfitFactor += profitFactor;
-        validProfitFactorCount++;
+      if (profitFactor > bestProfitFactor) {
+        bestProfitFactor = profitFactor;
+        bestResult = result;
       }
     });
+    
+    const bestPnl = bestResult ? parsePercentage(bestResult.pnl) : 0;
     
     stats.push({
       timeframe,
       total_runs,
       best_pnl: bestPnl,
       best_config: bestResult,
-      avg_win_rate: validWinRateCount > 0 ? totalWinRate / validWinRateCount : 0,
-      avg_profit_factor: validProfitFactorCount > 0 ? totalProfitFactor / validProfitFactorCount : 0,
     });
   }
   
