@@ -36,7 +36,7 @@ async function DashboardContent() {
       <section>
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
-          Overall Performance Metrics
+          Peak Performance Highlights
         </h2>
         <PerformanceMetrics results={allResults} />
       </section>
@@ -79,15 +79,16 @@ async function DashboardContent() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="2h" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="2h">2H</TabsTrigger>
                 <TabsTrigger value="3h">3H</TabsTrigger>
                 <TabsTrigger value="4h">4H</TabsTrigger>
                 <TabsTrigger value="5h">5H</TabsTrigger>
                 <TabsTrigger value="6h">6H</TabsTrigger>
+                <TabsTrigger value="fixed">Fixed</TabsTrigger>
               </TabsList>
               
-              {['2h', '3h', '4h', '5h', '6h'].map((tf) => {
+              {['2h', '3h', '4h', '5h', '6h', 'fixed'].map((tf) => {
                 const tfResults = recentResults.filter(r => r.chart_tf === tf);
                 const tfStats = timeframeStats.find(s => s.timeframe === tf);
                 

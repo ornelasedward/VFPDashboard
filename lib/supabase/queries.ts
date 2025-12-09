@@ -67,7 +67,8 @@ export async function getTableNames(): Promise<string[]> {
     'btc_usdt_3h_results',
     'btc_usdt_4h_results',
     'btc_usdt_5h_results',
-    'btc_usdt_6h_results'
+    'btc_usdt_6h_results',
+    'btc_usdt_fixed_settings'
   ];
 }
 
@@ -80,11 +81,16 @@ export async function getTimeframeStats(): Promise<TimeframeStats[]> {
   const stats: TimeframeStats[] = [];
   
   for (const tableName of tableNames) {
-    // Extract timeframe from table name (e.g., "btc_usdt_2h_results" -> "2h")
+    // Extract timeframe from table name (e.g., "btc_usdt_2h_results" -> "2h", "btc_usdt_fixed_settings" -> "fixed")
+    let timeframe: string;
     const timeframeMatch = tableName.match(/_(\d+h)_results$/);
-    if (!timeframeMatch) continue;
-    
-    const timeframe = timeframeMatch[1];
+    if (timeframeMatch) {
+      timeframe = timeframeMatch[1];
+    } else if (tableName.includes('fixed_settings')) {
+      timeframe = 'fixed';
+    } else {
+      continue;
+    }
     
     // Fetch all results using pagination (Supabase has 1000 row limit per request)
     const allResults: any[] = [];

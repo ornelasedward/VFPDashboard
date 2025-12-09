@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StrategyResult } from "@/lib/supabase/queries";
-import { Activity, TrendingUp, Target, BarChart3, Percent, DollarSign } from "lucide-react";
+import { Activity, TrendingUp, Target, BarChart3, Percent, DollarSign, Trophy } from "lucide-react";
+import Link from "next/link";
 
 interface PerformanceMetricsProps {
   results: StrategyResult[];
@@ -18,19 +19,27 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
     return parseFloat(value.replace(/[^0-9.-]/g, '')) || 0;
   };
 
-  // Calculate aggregate metrics
+  // Calculate best performance metrics
   const totalRuns = results.length;
-  
-  const avgPnl = results.reduce((sum, r) => sum + parsePercentage(r.pnl), 0) / totalRuns;
-  const avgWinRate = results.reduce((sum, r) => sum + parsePercentage(r.win_rate), 0) / totalRuns;
-  const avgProfitFactor = results.reduce((sum, r) => sum + parseNumber(r.profit_factor), 0) / totalRuns;
-  const avgMaxDD = results.reduce((sum, r) => sum + Math.abs(parsePercentage(r.max_dd)), 0) / totalRuns;
   
   const profitableStrategies = results.filter(r => parsePercentage(r.pnl) > 0).length;
   const profitablePercentage = (profitableStrategies / totalRuns) * 100;
 
   const bestPnl = Math.max(...results.map(r => parsePercentage(r.pnl)));
-  const worstPnl = Math.min(...results.map(r => parsePercentage(r.pnl)));
+  const bestWinRate = Math.max(...results.map(r => parsePercentage(r.win_rate)));
+  const bestProfitFactor = Math.max(...results.map(r => parseNumber(r.profit_factor)));
+  const bestMaxDD = Math.min(...results.map(r => Math.abs(parsePercentage(r.max_dd))));
+  const bestDollarPnl = Math.max(...results.map(r => parseNumber(r.net_profit_all)));
+  
+  // Find the strategy with the best PnL for context
+  const topStrategy = results.reduce((best, current) => 
+    parsePercentage(current.pnl) > parsePercentage(best.pnl) ? current : best
+  , results[0]);
+  
+  // Find the strategy with the best dollar PnL
+  const topDollarStrategy = results.reduce((best, current) => 
+    parseNumber(current.net_profit_all) > parseNumber(best.net_profit_all) ? current : best
+  , results[0]);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -47,64 +56,83 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Average PnL</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className={`text-2xl font-bold ${avgPnl > 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {avgPnl.toFixed(2)}%
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Range: {worstPnl.toFixed(2)}% to {bestPnl.toFixed(2)}%
-          </p>
-        </CardContent>
-      </Card>
+      <Link href={`/strategy/${topStrategy.id}`}>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Highest PnL</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${bestPnl > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {bestPnl.toFixed(2)}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {topStrategy.chart_tf} timeframe • Click for details
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Average Win Rate</CardTitle>
+          <CardTitle className="text-sm font-medium">Highest Win Rate</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{avgWinRate.toFixed(1)}%</div>
+          <div className="text-2xl font-bold">{bestWinRate.toFixed(1)}%</div>
           <p className="text-xs text-muted-foreground">
-            Across all timeframes
+            Best across all strategies
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Average Profit Factor</CardTitle>
+          <CardTitle className="text-sm font-medium">Highest Profit Factor</CardTitle>
           <BarChart3 className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{avgProfitFactor.toFixed(2)}</div>
+          <div className="text-2xl font-bold">{bestProfitFactor.toFixed(2)}</div>
           <p className="text-xs text-muted-foreground">
-            {avgProfitFactor > 1 ? 'Profitable' : 'Unprofitable'} on average
+            Peak performance ratio
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Average Max Drawdown</CardTitle>
+          <CardTitle className="text-sm font-medium">Lowest Max Drawdown</CardTitle>
           <Percent className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">-{avgMaxDD.toFixed(2)}%</div>
+          <div className="text-2xl font-bold text-green-600">-{bestMaxDD.toFixed(2)}%</div>
           <p className="text-xs text-muted-foreground">
-            Risk metric
+            Best risk control
           </p>
         </CardContent>
       </Card>
+
+      <Link href={`/strategy/${topDollarStrategy.id}`}>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Highest Dollar PnL</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${bestDollarPnl > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              ${bestDollarPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {topDollarStrategy.chart_tf} timeframe • Click for details
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Profitable Strategies</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <Trophy className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{profitableStrategies}</div>
