@@ -11,6 +11,7 @@ export interface StrategyResult {
   lookback: number;
   primary_speed: string;
   secondary_speed: string;
+  fusion_smoothing: string;
   trend_type: string;
   smoothing_type: string;
   resolutions: string;
