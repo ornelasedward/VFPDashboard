@@ -37,7 +37,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
             <TableHead>Lookback</TableHead>
             <TableHead>Primary Speed</TableHead>
             <TableHead>Secondary Speed</TableHead>
-            <TableHead>Fusion Smoothing</TableHead>
+            <TableHead>Smoothing Type</TableHead>
             <TableHead>Trend Type</TableHead>
           </TableRow>
         </TableHeader>
@@ -113,7 +113,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
                   </TableCell>
                   <TableCell className="text-xs">
                     <Link href={`/strategy/${result.id}`} className="block">
-                      {result.fusion_smoothing}
+                      {result.smoothing_type}
                     </Link>
                   </TableCell>
                   <TableCell>
