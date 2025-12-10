@@ -11,7 +11,9 @@ interface TimeframeOverviewProps {
 export function TimeframeOverview({ stats }: TimeframeOverviewProps) {
   const parsePercentage = (value: string | null): number => {
     if (!value) return 0;
-    const cleaned = value.replace('%', '').trim();
+    // Replace Unicode minus sign (−) with regular minus (-)
+    const normalized = value.replace(/−/g, '-');
+    const cleaned = normalized.replace('%', '').trim();
     return parseFloat(cleaned) || 0;
   };
 
@@ -27,7 +29,7 @@ export function TimeframeOverview({ stats }: TimeframeOverviewProps) {
         const trades = stat.best_config.trades;
         
         return (
-          <Link key={stat.timeframe} href={`/strategy/${stat.best_config.id}`}>
+          <Link key={stat.timeframe} href={`/strategy/${stat.best_config.id}?ticker=${encodeURIComponent(stat.best_config.ticker)}&timeframe=${stat.best_config.chart_tf}`}>
             <Card className="hover:shadow-lg transition-all hover:bg-muted/50 cursor-pointer h-full">
               <CardHeader>
                 <div className="flex items-center justify-between">

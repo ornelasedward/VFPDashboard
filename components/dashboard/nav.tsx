@@ -8,7 +8,7 @@ export function DashboardNav() {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 className="h-6 w-6" />
-          <Link href="/dashboard" className="text-xl font-bold">
+          <Link href="/" className="text-xl font-bold">
             VFP Trading Dashboard
           </Link>
         </div>

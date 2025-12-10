@@ -8,18 +8,14 @@ import { notFound } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
 
-async function getStrategyById(id: string): Promise<StrategyResult | null> {
+async function getStrategyById(id: string, ticker?: string, timeframe?: string): Promise<StrategyResult | null> {
   const supabase = await createClient();
   
-  // List of all tables to search
-  const tableNames = [
-    'btc_usdt_2h_results',
-    'btc_usdt_3h_results',
-    'btc_usdt_4h_results',
-    'btc_usdt_5h_results',
-    'btc_usdt_6h_results',
-    'btc_usdt_fixed_settings'
-  ];
+  // Import the dynamic table discovery function
+  const { getTableNames } = await import("@/lib/supabase/queries");
+  const tableNames = await getTableNames();
+  
+  console.log('🔍 Searching for strategy:', { id, ticker, timeframe, tables: tableNames });
   
   // Search each table for the strategy
   for (const tableName of tableNames) {
@@ -30,16 +26,47 @@ async function getStrategyById(id: string): Promise<StrategyResult | null> {
       .single();
     
     if (data && !error) {
-      return data as StrategyResult;
+      // If ticker and timeframe are provided, verify they match
+      if (ticker && timeframe) {
+        if (data.ticker === ticker && data.chart_tf === timeframe) {
+          console.log('✅ Found matching strategy in table:', tableName);
+          return data as StrategyResult;
+        } else {
+          console.log('⚠️ Found ID in', tableName, 'but ticker/timeframe mismatch. Continuing search...');
+          continue;
+        }
+      } else {
+        // No filter provided, return first match
+        console.log('✅ Found strategy in table:', tableName);
+        return data as StrategyResult;
+      }
     }
   }
   
+  console.log('❌ Strategy not found in any table');
   return null;
 }
 
-export default async function StrategyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function StrategyDetailPage({ 
+  params,
+  searchParams 
+}: { 
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ ticker?: string; timeframe?: string }>;
+}) {
   const { id } = await params;
-  const strategy = await getStrategyById(id);
+  const { ticker, timeframe } = await searchParams;
+  
+  console.log('🔍 Strategy Page - Request:', { id, ticker, timeframe });
+  
+  const strategy = await getStrategyById(id, ticker, timeframe);
+  
+  console.log('🔍 Strategy Page - Found Strategy:', {
+    id: strategy?.id,
+    ticker: strategy?.ticker,
+    chart_tf: strategy?.chart_tf,
+    pnl: strategy?.pnl,
+  });
   
   if (!strategy) {
     notFound();
@@ -47,17 +74,24 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
   
   const parsePercentage = (value: string | null): number => {
     if (!value) return 0;
-    const cleaned = value.replace('%', '').trim();
+    // Replace Unicode minus sign (−) with regular minus (-)
+    const normalized = value.replace(/−/g, '-');
+    const cleaned = normalized.replace('%', '').trim();
     return parseFloat(cleaned) || 0;
   };
 
   const parseNumber = (value: string | null): number => {
     if (!value) return 0;
-    return parseFloat(value.replace(/[^0-9.-]/g, '')) || 0;
+    // Replace Unicode minus sign (−) with regular minus (-)
+    const normalized = value.replace(/−/g, '-');
+    return parseFloat(normalized.replace(/[^0-9.-]/g, '')) || 0;
   };
 
   const STARTING_CAPITAL = 100000; // Starting capital in dollars
   const pnl = parsePercentage(strategy.pnl);
+  const winRate = parsePercentage(strategy.win_rate);
+  const profitFactor = parseNumber(strategy.profit_factor);
+  const maxDD = parsePercentage(strategy.max_dd);
   const netProfit = STARTING_CAPITAL * (pnl / 100); // Calculate net profit from PnL %
 
   return (
@@ -98,7 +132,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
                     </CardHeader>
                     <CardContent>
                       <div className={`text-3xl font-bold ${pnl > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {strategy.pnl}
+                        {pnl.toFixed(2)}%
                       </div>
                     </CardContent>
                   </Card>
@@ -119,7 +153,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
                       <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold">{strategy.win_rate}</div>
+                      <div className="text-3xl font-bold">{winRate.toFixed(1)}%</div>
                     </CardContent>
                   </Card>
 
@@ -128,7 +162,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
                       <CardTitle className="text-sm font-medium">Profit Factor</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold">{strategy.profit_factor}</div>
+                      <div className="text-3xl font-bold">{profitFactor.toFixed(2)}</div>
                     </CardContent>
                   </Card>
 
@@ -137,7 +171,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
                       <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold text-red-600">{strategy.max_dd}</div>
+                      <div className="text-3xl font-bold text-red-600">-{Math.abs(maxDD).toFixed(2)}%</div>
                     </CardContent>
                   </Card>
 

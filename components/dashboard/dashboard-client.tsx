@@ -42,7 +42,9 @@ export function DashboardClient({
     // When a ticker is selected, recalculate top 20 from all results for that ticker
     const parsePercentage = (value: string | null): number => {
       if (!value) return 0;
-      const cleaned = value.replace('%', '').trim();
+      // Replace Unicode minus sign (−) with regular minus (-)
+      const normalized = value.replace(/−/g, '-');
+      const cleaned = normalized.replace('%', '').trim();
       return parseFloat(cleaned) || 0;
     };
     
@@ -57,7 +59,9 @@ export function DashboardClient({
     
     const parsePercentage = (value: string | null): number => {
       if (!value) return 0;
-      const cleaned = value.replace('%', '').trim();
+      // Replace Unicode minus sign (−) with regular minus (-)
+      const normalized = value.replace(/−/g, '-');
+      const cleaned = normalized.replace('%', '').trim();
       return parseFloat(cleaned) || 0;
     };
     
@@ -146,7 +150,7 @@ export function DashboardClient({
           <BarChart3 className="h-5 w-5" />
           Peak Performance Highlights
         </h2>
-        <PerformanceMetrics results={filteredResults} />
+        <PerformanceMetrics key={selectedTicker || 'all'} results={filteredResults} selectedTicker={selectedTicker} />
       </section>
 
       {/* Timeframe Overview */}

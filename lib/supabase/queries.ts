@@ -47,14 +47,18 @@ export interface TimeframeStats {
 // Helper to parse percentage strings like "45.2%" to numbers
 function parsePercentage(value: string | null): number {
   if (!value) return 0;
-  const cleaned = value.replace('%', '').trim();
+  // Replace Unicode minus sign (−) with regular minus (-)
+  const normalized = value.replace(/−/g, '-');
+  const cleaned = normalized.replace('%', '').trim();
   return parseFloat(cleaned) || 0;
 }
 
 // Helper to parse dollar amounts like "$1,234.56" to numbers
 function parseDollar(value: string | null): number {
   if (!value) return 0;
-  const cleaned = value.replace(/[$,]/g, '').trim();
+  // Replace Unicode minus sign (−) with regular minus (-)
+  const normalized = value.replace(/−/g, '-');
+  const cleaned = normalized.replace(/[$,]/g, '').trim();
   return parseFloat(cleaned) || 0;
 }
 
