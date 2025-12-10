@@ -12,9 +12,12 @@ async function DashboardContent() {
     getUniqueTickers(),
   ]);
   
-  // Fetch top 20 performers for each timeframe
+  // Extract unique timeframes from the stats (dynamically discovered)
+  const uniqueTimeframes = timeframeStats.map(stat => stat.timeframe);
+  
+  // Fetch top 20 performers for each discovered timeframe
   const timeframeTopPerformers = await Promise.all(
-    ['2h', '3h', '4h', '5h', '6h', 'fixed'].map(async (tf) => ({
+    uniqueTimeframes.map(async (tf) => ({
       timeframe: tf,
       results: await getTopPerformersByTimeframe(tf, 20)
     }))

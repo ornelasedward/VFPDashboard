@@ -58,16 +58,83 @@ function parseDollar(value: string | null): number {
   return parseFloat(cleaned) || 0;
 }
 
+// Cache for table names to avoid repeated discovery
+let cachedTableNames: string[] | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export async function getTableNames(): Promise<string[]> {
-  // Return known table names based on your VM setup
-  return [
+  // Return cached tables if still valid
+  const now = Date.now();
+  if (cachedTableNames && (now - cacheTimestamp) < CACHE_DURATION) {
+    return cachedTableNames;
+  }
+
+  const supabase = await createClient();
+  const discoveredTables: string[] = [];
+  
+  // Known patterns for table discovery
+  const tickers = ['btc_usdt', 'eth_usdt', 'sol_usdt', 'bnb_usdt', 'ada_usdt'];
+  const timeframes = ['2h', '3h', '4h', '5h', '6h'];
+  const suffixes = ['results', 'settings'];
+  const specialSuffixes = ['fixed_settings', 'alex_settings', 'custom_settings'];
+  
+  console.log('🔍 Discovering tables dynamically...');
+  
+  // Try standard pattern: {ticker}_{timeframe}_{suffix}
+  for (const ticker of tickers) {
+    for (const timeframe of timeframes) {
+      for (const suffix of suffixes) {
+        const tableName = `${ticker}_${timeframe}_${suffix}`;
+        try {
+          const { error } = await supabase
+            .from(tableName)
+            .select('id')
+            .limit(1);
+          
+          if (!error) {
+            discoveredTables.push(tableName);
+          }
+        } catch (e) {
+          // Table doesn't exist, skip
+        }
+      }
+    }
+    
+    // Try special patterns: {ticker}_{special_suffix}
+    for (const suffix of specialSuffixes) {
+      const tableName = `${ticker}_${suffix}`;
+      try {
+        const { error } = await supabase
+          .from(tableName)
+          .select('id')
+          .limit(1);
+        
+        if (!error) {
+          discoveredTables.push(tableName);
+        }
+      } catch (e) {
+        // Table doesn't exist, skip
+      }
+    }
+  }
+  
+  // Cache the results
+  cachedTableNames = discoveredTables.length > 0 ? discoveredTables : [
+    // Fallback to known tables if discovery fails
     'btc_usdt_2h_results',
     'btc_usdt_3h_results',
     'btc_usdt_4h_results',
     'btc_usdt_5h_results',
     'btc_usdt_6h_results',
-    'btc_usdt_fixed_settings'
+    'btc_usdt_fixed_settings',
+    'eth_usdt_alex_settings'
   ];
+  cacheTimestamp = now;
+  
+  console.log(`✅ Discovered ${cachedTableNames.length} tables:`, cachedTableNames);
+  
+  return cachedTableNames;
 }
 
 export async function getTimeframeStats(): Promise<TimeframeStats[]> {
@@ -79,13 +146,22 @@ export async function getTimeframeStats(): Promise<TimeframeStats[]> {
   const stats: TimeframeStats[] = [];
   
   for (const tableName of tableNames) {
-    // Extract timeframe from table name (e.g., "btc_usdt_2h_results" -> "2h", "btc_usdt_fixed_settings" -> "fixed")
+    // Extract timeframe from table name
+    // Examples: "btc_usdt_2h_results" -> "2h", "btc_usdt_fixed_settings" -> "fixed", "eth_usdt_alex_settings" -> "alex"
     let timeframe: string;
     const timeframeMatch = tableName.match(/_(\d+h)_results$/);
     if (timeframeMatch) {
       timeframe = timeframeMatch[1];
     } else if (tableName.includes('fixed_settings')) {
       timeframe = 'fixed';
+    } else if (tableName.includes('alex_settings')) {
+      timeframe = 'alex';
+    } else if (tableName.includes('custom_settings')) {
+      timeframe = 'custom';
+    } else if (tableName.endsWith('_settings')) {
+      // Generic handler for any other _settings tables
+      const parts = tableName.split('_');
+      timeframe = parts[parts.length - 2]; // Get the word before 'settings'
     } else {
       continue;
     }
@@ -210,39 +286,70 @@ export async function getTopPerformers(limit: number = 10): Promise<StrategyResu
 
 export async function getResultsByTimeframe(timeframe: string): Promise<StrategyResult[]> {
   const supabase = await createClient();
-  const tableName = timeframe === 'fixed' ? 'btc_usdt_fixed_settings' : `btc_usdt_${timeframe}_results`;
+  const tableNames = await getTableNames();
   
-  // Fetch all results using pagination
+  // Find all tables that match this timeframe
+  const matchingTables = tableNames.filter(tableName => {
+    // Extract timeframe from table name using same logic as getTimeframeStats
+    const timeframeMatch = tableName.match(/_(\d+h)_results$/);
+    if (timeframeMatch && timeframeMatch[1] === timeframe) {
+      return true;
+    }
+    if (tableName.includes('fixed_settings') && timeframe === 'fixed') {
+      return true;
+    }
+    if (tableName.includes('alex_settings') && timeframe === 'alex') {
+      return true;
+    }
+    if (tableName.includes('custom_settings') && timeframe === 'custom') {
+      return true;
+    }
+    if (tableName.endsWith('_settings')) {
+      const parts = tableName.split('_');
+      const extractedTf = parts[parts.length - 2];
+      if (extractedTf === timeframe) {
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  console.log(`🔍 Found ${matchingTables.length} tables for timeframe ${timeframe}:`, matchingTables);
+  
   const allResults: any[] = [];
-  let from = 0;
-  const pageSize = 1000;
   
-  while (true) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, from + pageSize - 1);
+  // Fetch from all matching tables
+  for (const tableName of matchingTables) {
+    let from = 0;
+    const pageSize = 1000;
     
-    if (error) {
-      console.error(`Error fetching results for ${timeframe}:`, error);
-      break;
+    while (true) {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      
+      if (error) {
+        console.error(`Error fetching results from ${tableName}:`, error);
+        break;
+      }
+      
+      if (!data || data.length === 0) {
+        break;
+      }
+      
+      allResults.push(...data);
+      
+      if (data.length < pageSize) {
+        break;
+      }
+      
+      from += pageSize;
     }
-    
-    if (!data || data.length === 0) {
-      break;
-    }
-    
-    allResults.push(...data);
-    
-    if (data.length < pageSize) {
-      break;
-    }
-    
-    from += pageSize;
   }
   
-  console.log(`✅ Loaded ${allResults.length} results from ${tableName}`);
+  console.log(`✅ Loaded ${allResults.length} results for timeframe ${timeframe}`);
   
   return allResults as StrategyResult[];
 }

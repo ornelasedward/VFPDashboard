@@ -38,8 +38,19 @@ export function DashboardClient({
 
   const filteredTopPerformers = useMemo(() => {
     if (!selectedTicker) return topPerformers;
-    return topPerformers.filter(r => r.ticker === selectedTicker);
-  }, [topPerformers, selectedTicker]);
+    
+    // When a ticker is selected, recalculate top 20 from all results for that ticker
+    const parsePercentage = (value: string | null): number => {
+      if (!value) return 0;
+      const cleaned = value.replace('%', '').trim();
+      return parseFloat(cleaned) || 0;
+    };
+    
+    const tickerResults = allResults.filter(r => r.ticker === selectedTicker);
+    return tickerResults
+      .sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl))
+      .slice(0, 20);
+  }, [topPerformers, selectedTicker, allResults]);
 
   const filteredTimeframeStats = useMemo(() => {
     if (!selectedTicker) return timeframeStats;
@@ -89,6 +100,20 @@ export function DashboardClient({
       results: results.filter(r => r.ticker === selectedTicker),
     }));
   }, [timeframeTopPerformers, selectedTicker]);
+
+  // Find the first timeframe with data for the selected ticker
+  const defaultTimeframe = useMemo(() => {
+    if (!selectedTicker) {
+      return filteredTimeframeTopPerformers[0]?.timeframe || "2h";
+    }
+    
+    // Find first timeframe with results for the selected ticker
+    const firstWithData = filteredTimeframeTopPerformers.find(
+      ({ results }) => results.length > 0
+    );
+    
+    return firstWithData?.timeframe || filteredTimeframeTopPerformers[0]?.timeframe || "2h";
+  }, [selectedTicker, filteredTimeframeTopPerformers]);
 
   return (
     <div className="space-y-8">
@@ -163,14 +188,19 @@ export function DashboardClient({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="2h" className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="2h">2H</TabsTrigger>
-                <TabsTrigger value="3h">3H</TabsTrigger>
-                <TabsTrigger value="4h">4H</TabsTrigger>
-                <TabsTrigger value="5h">5H</TabsTrigger>
-                <TabsTrigger value="6h">6H</TabsTrigger>
-                <TabsTrigger value="fixed">Fixed</TabsTrigger>
+            <Tabs key={selectedTicker || 'all'} defaultValue={defaultTimeframe} className="w-full">
+              <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(filteredTimeframeTopPerformers.length, 8)}, minmax(0, 1fr))` }}>
+                {filteredTimeframeTopPerformers.map(({ timeframe, results }) => (
+                  <TabsTrigger 
+                    key={timeframe} 
+                    value={timeframe}
+                    disabled={results.length === 0}
+                    className={results.length === 0 ? 'opacity-50' : ''}
+                  >
+                    {timeframe.toUpperCase()}
+                    {results.length > 0 && <span className="ml-1 text-xs">({results.length})</span>}
+                  </TabsTrigger>
+                ))}
               </TabsList>
               
               {filteredTimeframeTopPerformers.map(({ timeframe, results }) => {
