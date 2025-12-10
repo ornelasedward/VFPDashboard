@@ -344,3 +344,34 @@ export async function getRecentResults(limit: number = 50): Promise<StrategyResu
   
   return sorted;
 }
+
+export async function getUniqueTickers(): Promise<string[]> {
+  const supabase = await createClient();
+  const tableNames = await getTableNames();
+  
+  console.log('🎯 Fetching unique tickers from all tables...');
+  
+  const tickersSet = new Set<string>();
+  
+  for (const tableName of tableNames) {
+    const { data: results, error } = await supabase
+      .from(tableName)
+      .select('ticker')
+      .limit(1000);
+    
+    if (error) {
+      console.error(`❌ Error fetching tickers from ${tableName}:`, error);
+    } else if (results) {
+      results.forEach((result: any) => {
+        if (result.ticker) {
+          tickersSet.add(result.ticker);
+        }
+      });
+    }
+  }
+  
+  const tickers = Array.from(tickersSet).sort();
+  console.log(`✅ Found ${tickers.length} unique tickers:`, tickers);
+  
+  return tickers;
+}

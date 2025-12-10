@@ -37,6 +37,9 @@ export function TimeframeOverview({ stats }: TimeframeOverviewProps) {
                     Best
                   </Badge>
                 </div>
+                <div className="mt-2">
+                  <Badge variant="secondary" className="font-semibold">{stat.best_config.ticker}</Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">

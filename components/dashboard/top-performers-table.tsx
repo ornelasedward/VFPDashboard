@@ -28,6 +28,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]">Rank</TableHead>
+            <TableHead>Ticker</TableHead>
             <TableHead>Timeframe</TableHead>
             <TableHead>PnL</TableHead>
             <TableHead>Win Rate</TableHead>
@@ -44,7 +45,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
         <TableBody>
           {results.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={12} className="text-center text-muted-foreground">
+              <TableCell colSpan={13} className="text-center text-muted-foreground">
                 No results found
               </TableCell>
             </TableRow>
@@ -61,6 +62,11 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
                       {index + 1 === 2 && <span className="text-gray-400">🥈</span>}
                       {index + 1 === 3 && <span className="text-orange-600">🥉</span>}
                       {index + 1 > 3 && <span className="text-muted-foreground">{index + 1}</span>}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/strategy/${result.id}`} className="block">
+                      <Badge variant="default" className="font-semibold">{result.ticker}</Badge>
                     </Link>
                   </TableCell>
                   <TableCell>

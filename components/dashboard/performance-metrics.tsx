@@ -86,7 +86,7 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
               {bestPnl.toFixed(2)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {topStrategy.chart_tf} timeframe • Click for details
+              {topStrategy.ticker} • {topStrategy.chart_tf} timeframe • Click for details
             </p>
           </CardContent>
         </Card>
@@ -142,7 +142,7 @@ export function PerformanceMetrics({ results }: PerformanceMetricsProps) {
               ${bestDollarPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {topDollarStrategy.chart_tf} timeframe • Click for details
+              {topDollarStrategy.ticker} • {topDollarStrategy.chart_tf} timeframe • Click for details
             </p>
           </CardContent>
         </Card>
