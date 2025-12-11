@@ -182,7 +182,14 @@ export function PerformanceMetrics({ results, selectedTicker }: PerformanceMetri
           <Percent className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">-{bestMaxDD.toFixed(2)}%</div>
+          <div className={`text-2xl font-bold ${
+            bestMaxDD < 15 ? 'text-green-600' :
+            bestMaxDD < 30 ? 'text-yellow-600' :
+            bestMaxDD < 50 ? 'text-orange-600' :
+            'text-red-600'
+          }`}>
+            {bestMaxDD.toFixed(2)}%
+          </div>
           <p className="text-xs text-muted-foreground">
             Best risk control
           </p>

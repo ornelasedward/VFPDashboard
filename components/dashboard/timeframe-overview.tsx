@@ -64,7 +64,14 @@ export function TimeframeOverview({ stats }: TimeframeOverviewProps) {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Max Drawdown</span>
-                    <span className="font-semibold text-red-600">-{Math.abs(maxDD).toFixed(2)}%</span>
+                    <span className={`font-semibold ${
+                      Math.abs(maxDD) < 15 ? 'text-green-600' :
+                      Math.abs(maxDD) < 30 ? 'text-yellow-600' :
+                      Math.abs(maxDD) < 50 ? 'text-orange-600' :
+                      'text-red-600'
+                    }`}>
+                      {Math.abs(maxDD).toFixed(2)}%
+                    </span>
                   </div>
                   
                   <div className="flex justify-between items-center">

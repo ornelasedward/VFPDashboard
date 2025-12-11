@@ -171,7 +171,14 @@ export default async function StrategyDetailPage({
                       <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold text-red-600">-{Math.abs(maxDD).toFixed(2)}%</div>
+                      <div className={`text-3xl font-bold ${
+                        Math.abs(maxDD) < 15 ? 'text-green-600' :
+                        Math.abs(maxDD) < 30 ? 'text-yellow-600' :
+                        Math.abs(maxDD) < 50 ? 'text-orange-600' :
+                        'text-red-600'
+                      }`}>
+                        {Math.abs(maxDD).toFixed(2)}%
+                      </div>
                     </CardContent>
                   </Card>
 
