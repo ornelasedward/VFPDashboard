@@ -4,11 +4,12 @@ import { useState, useMemo } from "react";
 import { StrategyResult, TimeframeStats } from "@/lib/supabase/queries";
 import { TimeframeOverview } from "@/components/dashboard/timeframe-overview";
 import { TopPerformersTable } from "@/components/dashboard/top-performers-table";
-import { PerformanceMetrics } from "@/components/dashboard/performance-metrics";
-import { TickerFilter } from "@/components/dashboard/ticker-filter";
+import { OverviewStats } from "@/components/dashboard/overview-stats";
+import { BestStrategyShowcase } from "@/components/dashboard/best-strategy-showcase";
+import { StrategyFiltersComponent, StrategyFilters } from "@/components/dashboard/strategy-filters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, TrendingUp, BarChart3 } from "lucide-react";
+import { Activity, TrendingUp, Award } from "lucide-react";
 
 interface DashboardClientProps {
   timeframeStats: TimeframeStats[];
@@ -28,57 +29,65 @@ export function DashboardClient({
   timeframeTopPerformers,
   availableTickers,
 }: DashboardClientProps) {
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [filters, setFilters] = useState<StrategyFilters>({
+    maxDrawdown: 30,
+    minPnl: -100,
+    maxPnl: 10000,
+    minWinRate: 0,
+    ticker: null,
+  });
 
-  // Filter results based on selected ticker
+  // Helper function to parse percentages
+  const parsePercentage = (value: string | null): number => {
+    if (!value) return 0;
+    const normalized = value.replace(/−/g, '-');
+    const cleaned = normalized.replace('%', '').trim();
+    return parseFloat(cleaned) || 0;
+  };
+
+  // Apply all filters to results
   const filteredResults = useMemo(() => {
-    if (!selectedTicker) return allResults;
-    return allResults.filter(r => r.ticker === selectedTicker);
-  }, [allResults, selectedTicker]);
+    return allResults.filter(r => {
+      // Ticker filter
+      if (filters.ticker && r.ticker !== filters.ticker) return false;
+      
+      // Max drawdown filter
+      const maxDD = Math.abs(parsePercentage(r.max_dd));
+      if (maxDD > filters.maxDrawdown) return false;
+      
+      // PnL range filter
+      const pnl = parsePercentage(r.pnl);
+      if (pnl < filters.minPnl || pnl > filters.maxPnl) return false;
+      
+      // Win rate filter
+      const winRate = parsePercentage(r.win_rate);
+      if (winRate < filters.minWinRate) return false;
+      
+      return true;
+    });
+  }, [allResults, filters]);
 
   const filteredTopPerformers = useMemo(() => {
-    if (!selectedTicker) return topPerformers;
-    
-    // When a ticker is selected, recalculate top 20 from all results for that ticker
-    const parsePercentage = (value: string | null): number => {
-      if (!value) return 0;
-      // Replace Unicode minus sign (−) with regular minus (-)
-      const normalized = value.replace(/−/g, '-');
-      const cleaned = normalized.replace('%', '').trim();
-      return parseFloat(cleaned) || 0;
-    };
-    
-    const tickerResults = allResults.filter(r => r.ticker === selectedTicker);
-    return tickerResults
+    return filteredResults
       .sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl))
       .slice(0, 20);
-  }, [topPerformers, selectedTicker, allResults]);
+  }, [filteredResults]);
 
   const filteredTimeframeStats = useMemo(() => {
-    if (!selectedTicker) return timeframeStats;
-    
-    const parsePercentage = (value: string | null): number => {
-      if (!value) return 0;
-      // Replace Unicode minus sign (−) with regular minus (-)
-      const normalized = value.replace(/−/g, '-');
-      const cleaned = normalized.replace('%', '').trim();
-      return parseFloat(cleaned) || 0;
-    };
-    
     return timeframeStats.map(stat => {
-      const filteredResults: StrategyResult[] = allResults.filter(
-        r => r.chart_tf === stat.timeframe && r.ticker === selectedTicker
+      const timeframeFiltered = filteredResults.filter(
+        r => r.chart_tf === stat.timeframe
       );
       
-      if (filteredResults.length === 0) {
+      if (timeframeFiltered.length === 0) {
         return { ...stat, total_runs: 0, best_pnl: 0, best_config: null };
       }
 
       // Find best performer by profit factor
-      let bestResult = filteredResults[0];
-      let bestProfitFactor = parseFloat(filteredResults[0].profit_factor || '0');
+      let bestResult = timeframeFiltered[0];
+      let bestProfitFactor = parseFloat(timeframeFiltered[0].profit_factor || '0');
       
-      filteredResults.forEach((result: StrategyResult) => {
+      timeframeFiltered.forEach((result: StrategyResult) => {
         const profitFactor = parseFloat(result.profit_factor || '0');
         if (profitFactor > bestProfitFactor) {
           bestProfitFactor = profitFactor;
@@ -90,34 +99,42 @@ export function DashboardClient({
 
       return {
         ...stat,
-        total_runs: filteredResults.length,
+        total_runs: timeframeFiltered.length,
         best_pnl: bestPnl,
         best_config: bestResult,
       };
     });
-  }, [timeframeStats, allResults, selectedTicker]);
+  }, [timeframeStats, filteredResults]);
 
   const filteredTimeframeTopPerformers = useMemo(() => {
-    if (!selectedTicker) return timeframeTopPerformers;
-    return timeframeTopPerformers.map(({ timeframe, results }) => ({
-      timeframe,
-      results: results.filter(r => r.ticker === selectedTicker),
-    }));
-  }, [timeframeTopPerformers, selectedTicker]);
+    return timeframeTopPerformers.map(({ timeframe }) => {
+      // Use already-filtered results and filter by timeframe
+      const timeframeResults = filteredResults.filter(r => r.chart_tf === timeframe);
+      
+      // Sort by profit factor (descending) and take top 20
+      const sorted = timeframeResults
+        .sort((a, b) => {
+          const pfA = parseFloat(a.profit_factor || '0');
+          const pfB = parseFloat(b.profit_factor || '0');
+          return pfB - pfA;
+        })
+        .slice(0, 20);
+      
+      return {
+        timeframe,
+        results: sorted,
+      };
+    });
+  }, [timeframeTopPerformers, filteredResults]);
 
-  // Find the first timeframe with data for the selected ticker
+  // Find the first timeframe with data
   const defaultTimeframe = useMemo(() => {
-    if (!selectedTicker) {
-      return filteredTimeframeTopPerformers[0]?.timeframe || "2h";
-    }
-    
-    // Find first timeframe with results for the selected ticker
     const firstWithData = filteredTimeframeTopPerformers.find(
       ({ results }) => results.length > 0
     );
     
     return firstWithData?.timeframe || filteredTimeframeTopPerformers[0]?.timeframe || "2h";
-  }, [selectedTicker, filteredTimeframeTopPerformers]);
+  }, [filteredTimeframeTopPerformers]);
 
   return (
     <div className="space-y-8">
@@ -135,23 +152,30 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* Ticker Filter */}
+      {/* Strategy Filters */}
       <section>
-        <TickerFilter
-          tickers={availableTickers}
-          selectedTicker={selectedTicker}
-          onTickerChange={setSelectedTicker}
+        <StrategyFiltersComponent
+          filters={filters}
+          onFiltersChange={setFilters}
+          availableTickers={availableTickers}
         />
       </section>
 
-      {/* Performance Metrics Overview */}
+      {/* Overview Statistics */}
       <section>
-        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Peak Performance Highlights
-        </h2>
-        <PerformanceMetrics key={selectedTicker || 'all'} results={filteredResults} selectedTicker={selectedTicker} />
+        <OverviewStats results={filteredResults} />
       </section>
+
+      {/* Best Strategy Showcase */}
+      {filteredTopPerformers.length > 0 && (
+        <section>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            Top Performing Strategy
+          </h2>
+          <BestStrategyShowcase strategy={filteredTopPerformers[0]} />
+        </section>
+      )}
 
       {/* Timeframe Overview */}
       <section>
@@ -172,7 +196,9 @@ export function DashboardClient({
             </CardTitle>
             <CardDescription>
               Ranked by PnL across all timeframes and configurations
-              {selectedTicker && ` • Filtered by ${selectedTicker}`}
+              {filters.ticker && ` • ${filters.ticker}`}
+              {filters.maxDrawdown < 100 && ` • Max DD ≤${filters.maxDrawdown}%`}
+              {filters.minWinRate > 0 && ` • Win Rate ≥${filters.minWinRate}%`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -188,11 +214,13 @@ export function DashboardClient({
             <CardTitle>Top 20 Performers by Timeframe</CardTitle>
             <CardDescription>
               Best performing strategies sorted by profit factor (highest to lowest)
-              {selectedTicker && ` • Filtered by ${selectedTicker}`}
+              {filters.ticker && ` • ${filters.ticker}`}
+              {filters.maxDrawdown < 100 && ` • Max DD ≤${filters.maxDrawdown}%`}
+              {filters.minWinRate > 0 && ` • Win Rate ≥${filters.minWinRate}%`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs key={selectedTicker || 'all'} defaultValue={defaultTimeframe} className="w-full">
+            <Tabs key={JSON.stringify(filters)} defaultValue={defaultTimeframe} className="w-full">
               <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(filteredTimeframeTopPerformers.length, 8)}, minmax(0, 1fr))` }}>
                 {filteredTimeframeTopPerformers.map(({ timeframe, results }) => (
                   <TabsTrigger 
