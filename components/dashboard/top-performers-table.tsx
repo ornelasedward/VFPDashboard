@@ -55,6 +55,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
             results.map((result, index) => {
               const pnl = parsePercentage(result.pnl);
               const isProfitable = pnl > 0;
+              const maxDD = Math.abs(parsePercentage(result.max_dd));
               
               const strategyLink = `/strategy/${result.id}?ticker=${encodeURIComponent(result.ticker)}&timeframe=${result.chart_tf}`;
               
@@ -96,9 +97,16 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
                       {result.profit_factor}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-red-600">
+                  <TableCell>
                     <Link href={strategyLink} className="block">
-                      {result.max_dd}
+                      <span className={`font-semibold ${
+                        maxDD < 15 ? 'text-green-600' :
+                        maxDD < 30 ? 'text-yellow-600' :
+                        maxDD < 50 ? 'text-orange-600' :
+                        'text-red-600'
+                      }`}>
+                        {maxDD.toFixed(2)}%
+                      </span>
                     </Link>
                   </TableCell>
                   <TableCell>
