@@ -20,7 +20,26 @@ export function TimeframeOverview({ stats }: TimeframeOverviewProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {stats.map((stat) => {
-        if (!stat.best_config) return null;
+        // Show card even if no results match current filters
+        if (!stat.best_config) {
+          return (
+            <Card key={stat.timeframe} className="h-full opacity-60">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{stat.timeframe.toUpperCase()} Timeframe</CardTitle>
+                  <Badge variant="outline">No Results</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center h-32 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No strategies match current filters for this timeframe
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
         
         const pnl = stat.best_pnl;
         const winRate = parsePercentage(stat.best_config.win_rate);
