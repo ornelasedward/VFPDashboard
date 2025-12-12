@@ -62,28 +62,21 @@ export function PerformanceMetrics({ results, selectedTicker }: PerformanceMetri
 
   const STARTING_CAPITAL = 100000; // Starting capital in dollars
   
-  const bestPnl = Math.max(...results.map(r => parsePercentage(r.pnl)));
-  const bestWinRate = Math.max(...results.map(r => parsePercentage(r.win_rate)));
-  const bestProfitFactor = Math.max(...results.map(r => parseNumber(r.profit_factor)));
-  
-  // Find lowest max drawdown (excluding zero/invalid values)
-  const validDrawdowns = results
-    .map(r => Math.abs(parsePercentage(r.max_dd)))
-    .filter(dd => dd > 0); // Filter out zero values
-  const bestMaxDD = validDrawdowns.length > 0 ? Math.min(...validDrawdowns) : 0;
-  
-  // Calculate dollar PnL based on percentage PnL and starting capital
-  const bestDollarPnl = Math.max(...results.map(r => {
-    const pnlPercent = parsePercentage(r.pnl);
-    return STARTING_CAPITAL * (pnlPercent / 100);
-  }));
-  
-  // Find the strategy with the best PnL for context
+  // Find the strategy with the best PnL - ALL metrics will come from this single strategy
   const topStrategy = results.reduce((best, current) => 
     parsePercentage(current.pnl) > parsePercentage(best.pnl) ? current : best
   , results[0]);
   
-  // Find the strategy with the best dollar PnL (same as best PnL % since capital is constant)
+  // Extract all metrics from the top-performing strategy
+  const bestPnl = parsePercentage(topStrategy.pnl);
+  const bestWinRate = parsePercentage(topStrategy.win_rate);
+  const bestProfitFactor = parseNumber(topStrategy.profit_factor);
+  const bestMaxDD = Math.abs(parsePercentage(topStrategy.max_dd));
+  
+  // Calculate dollar PnL based on the top strategy's percentage PnL
+  const bestDollarPnl = STARTING_CAPITAL * (bestPnl / 100);
+  
+  // Same strategy for dollar PnL display
   const topDollarStrategy = topStrategy;
   
   // Debug logging
@@ -152,33 +145,33 @@ export function PerformanceMetrics({ results, selectedTicker }: PerformanceMetri
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Highest Win Rate</CardTitle>
+          <CardTitle className="text-sm font-medium">Win Rate (Best Strategy)</CardTitle>
           <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{bestWinRate.toFixed(1)}%</div>
           <p className="text-xs text-muted-foreground">
-            Best across all strategies
+            {topStrategy.ticker} • {topStrategy.chart_tf} timeframe
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Highest Profit Factor</CardTitle>
+          <CardTitle className="text-sm font-medium">Profit Factor (Best Strategy)</CardTitle>
           <BarChart3 className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{bestProfitFactor.toFixed(2)}</div>
           <p className="text-xs text-muted-foreground">
-            Peak performance ratio
+            {topStrategy.ticker} • {topStrategy.chart_tf} timeframe
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Lowest Max Drawdown</CardTitle>
+          <CardTitle className="text-sm font-medium">Max Drawdown (Best Strategy)</CardTitle>
           <Percent className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -191,7 +184,7 @@ export function PerformanceMetrics({ results, selectedTicker }: PerformanceMetri
             {bestMaxDD.toFixed(2)}%
           </div>
           <p className="text-xs text-muted-foreground">
-            Best risk control
+            {topStrategy.ticker} • {topStrategy.chart_tf} timeframe
           </p>
         </CardContent>
       </Card>
