@@ -1,368 +1,153 @@
 import { createClient } from "@/lib/supabase/server";
+import { parsePercentage, parseDollar } from "@/lib/utils/parse";
+import { StrategyResult, TimeframeStats, CoinTimeframeBest } from "@/lib/types/strategy";
 
-export interface StrategyResult {
-  id: number;
-  created_at: string;
-  ticker: string;
-  exchange: string;
-  date_start: string;
-  date_end: string;
-  chart_tf: string;
-  lookback: number;
-  primary_speed: string;
-  secondary_speed: string;
-  trend_type: string;
-  smoothing_type: string;
-  resolutions: string;
-  
-  // Key metrics
-  pnl: string;
-  max_dd: string;
-  trades: string;
-  win_rate: string;
-  profit_factor: string;
-  buy_hold: string;
-  
-  // Performance metrics
-  net_profit_all: string;
-  sharpe_ratio: string;
-  sortino_ratio: string;
-  
-  // Trade analysis
-  total_long_trades: string;
-  total_short_trades: string;
-  winning_trades_all: string;
-  losing_trades_all: string;
-  avg_win_trade_all: string;
-  avg_loss_trade_all: string;
-}
+// Re-export types and utilities for backward compatibility
+export { parsePercentage };
+export type { StrategyResult, TimeframeStats, CoinTimeframeBest };
 
-export interface TimeframeStats {
-  timeframe: string;
-  total_runs: number;
-  best_pnl: number;
-  best_config: StrategyResult | null;
-}
-
-// Helper to parse percentage strings like "45.2%" to numbers
-function parsePercentage(value: string | null): number {
-  if (!value) return 0;
-  // Replace Unicode minus sign (−) with regular minus (-)
-  const normalized = value.replace(/−/g, '-');
-  const cleaned = normalized.replace('%', '').trim();
-  return parseFloat(cleaned) || 0;
-}
-
-// Helper to parse dollar amounts like "$1,234.56" to numbers
-function parseDollar(value: string | null): number {
-  if (!value) return 0;
-  // Replace Unicode minus sign (−) with regular minus (-)
-  const normalized = value.replace(/−/g, '-');
-  const cleaned = normalized.replace(/[$,]/g, '').trim();
-  return parseFloat(cleaned) || 0;
-}
-
-// Cache for table names to avoid repeated discovery
-let cachedTableNames: string[] | null = null;
-let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-export async function getTableNames(): Promise<string[]> {
-  // Return cached tables if still valid
-  const now = Date.now();
-  if (cachedTableNames && (now - cacheTimestamp) < CACHE_DURATION) {
-    return cachedTableNames;
-  }
-
-  const supabase = await createClient();
-  const discoveredTables: string[] = [];
-  
-  // Known patterns for table discovery
-  const tickers = ['btc_usdt', 'eth_usdt', 'sol_usdt', 'bnb_usdt', 'ada_usdt'];
-  const timeframes = ['2h', '3h', '4h', '5h', '6h'];
-  const suffixes = ['results', 'settings'];
-  const specialSuffixes = ['fixed_settings', 'alex_settings', 'custom_settings'];
-  
-  console.log('🔍 Discovering tables dynamically...');
-  
-  // Try standard pattern: {ticker}_{timeframe}_{suffix}
-  for (const ticker of tickers) {
-    for (const timeframe of timeframes) {
-      for (const suffix of suffixes) {
-        const tableName = `${ticker}_${timeframe}_${suffix}`;
-        try {
-          const { error } = await supabase
-            .from(tableName)
-            .select('id')
-            .limit(1);
-          
-          if (!error) {
-            discoveredTables.push(tableName);
-          }
-        } catch (e) {
-          // Table doesn't exist, skip
-        }
-      }
-    }
-    
-    // Try special patterns: {ticker}_{special_suffix}
-    for (const suffix of specialSuffixes) {
-      const tableName = `${ticker}_${suffix}`;
-      try {
-        const { error } = await supabase
-          .from(tableName)
-          .select('id')
-          .limit(1);
-        
-        if (!error) {
-          discoveredTables.push(tableName);
-        }
-      } catch (e) {
-        // Table doesn't exist, skip
-      }
-    }
-  }
-  
-  // Cache the results
-  cachedTableNames = discoveredTables.length > 0 ? discoveredTables : [
-    // Fallback to known tables if discovery fails
-    'btc_usdt_2h_results',
-    'btc_usdt_3h_results',
-    'btc_usdt_4h_results',
-    'btc_usdt_5h_results',
-    'btc_usdt_6h_results',
-    'btc_usdt_fixed_settings',
-    'eth_usdt_alex_settings'
-  ];
-  cacheTimestamp = now;
-  
-  console.log(`✅ Discovered ${cachedTableNames.length} tables:`, cachedTableNames);
-  
-  return cachedTableNames;
-}
+// Unified table name
+const UNIFIED_TABLE = 'trading_results_unified';
 
 export async function getTimeframeStats(): Promise<TimeframeStats[]> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  console.log('📊 Fetching stats from tables:', tableNames);
+  console.log(`📊 Fetching timeframe stats from ${UNIFIED_TABLE}`);
   
-  const stats: TimeframeStats[] = [];
+  // Known timeframes - avoid fetching all rows just to discover them
+  const knownTimeframes = ['2h', '3h', '4h', '5h', '6h', '8h', '12h', '1d'];
   
-  for (const tableName of tableNames) {
-    // Extract timeframe from table name
-    // Examples: "btc_usdt_2h_results" -> "2h", "btc_usdt_fixed_settings" -> "fixed", "eth_usdt_alex_settings" -> "alex"
-    let timeframe: string;
-    const timeframeMatch = tableName.match(/_(\d+h)_results$/);
-    if (timeframeMatch) {
-      timeframe = timeframeMatch[1];
-    } else if (tableName.includes('fixed_settings')) {
-      timeframe = 'fixed';
-    } else if (tableName.includes('alex_settings')) {
-      timeframe = 'alex';
-    } else if (tableName.includes('custom_settings')) {
-      timeframe = 'custom';
-    } else if (tableName.endsWith('_settings')) {
-      // Generic handler for any other _settings tables
-      const parts = tableName.split('_');
-      timeframe = parts[parts.length - 2]; // Get the word before 'settings'
-    } else {
-      continue;
-    }
-    
-    // Fetch all results using pagination (Supabase has 1000 row limit per request)
-    const allResults: any[] = [];
-    let from = 0;
-    const pageSize = 1000;
-    
-    while (true) {
-      const { data: results, error } = await supabase
-        .from(tableName)
+  // For each timeframe, get count and best performer in parallel
+  const stats: TimeframeStats[] = (await Promise.all(
+    knownTimeframes.map(async (timeframe) => {
+      // Get count for this timeframe
+      const { count, error: countError } = await supabase
+        .from(UNIFIED_TABLE)
+        .select('*', { count: 'exact', head: true })
+        .eq('chart_tf', timeframe);
+      
+      if (countError || !count || count === 0) {
+        return null; // Skip timeframes with no data
+      }
+      
+      // Get a sample to find best performer
+      const { data: topResults, error } = await supabase
+        .from(UNIFIED_TABLE)
         .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
+        .eq('chart_tf', timeframe)
+        .limit(100);
       
-      if (error) {
-        console.error(`❌ Error fetching data from ${tableName}:`, error);
-        break;
+      if (error || !topResults || topResults.length === 0) {
+        return {
+          timeframe,
+          total_runs: count,
+          best_pnl: 0,
+          best_config: null,
+        };
       }
       
-      if (!results || results.length === 0) {
-        break;
-      }
+      // Find best by profit factor
+      let bestResult = topResults[0];
+      let bestProfitFactor = parseFloat(topResults[0].profit_factor || '0');
       
-      allResults.push(...results);
+      topResults.forEach((result: any) => {
+        const pf = parseFloat(result.profit_factor || '0');
+        if (pf > bestProfitFactor) {
+          bestProfitFactor = pf;
+          bestResult = result;
+        }
+      });
       
-      if (results.length < pageSize) {
-        break; // Last page
-      }
-      
-      from += pageSize;
-    }
-    
-    if (allResults.length === 0) {
-      console.warn(`⚠️ No data found in ${tableName}`);
-      continue;
-    }
-    
-    console.log(`✅ Loaded ${allResults.length} results from ${tableName}`);
-    
-    // Calculate stats - find best performer by profit factor
-    const total_runs = allResults.length;
-    
-    // Find best performer by profit factor
-    let bestResult: any = null;
-    let bestProfitFactor = -Infinity;
-    
-    allResults.forEach((result: any) => {
-      const profitFactor = parseFloat(result.profit_factor || '0');
-      if (profitFactor > bestProfitFactor) {
-        bestProfitFactor = profitFactor;
-        bestResult = result;
-      }
-    });
-    
-    const bestPnl = bestResult ? parsePercentage(bestResult.pnl) : 0;
-    
-    stats.push({
-      timeframe,
-      total_runs,
-      best_pnl: bestPnl,
-      best_config: bestResult,
-    });
-  }
+      return {
+        timeframe,
+        total_runs: count,
+        best_pnl: parsePercentage(bestResult.pnl),
+        best_config: bestResult as StrategyResult,
+      };
+    })
+  )).filter((stat): stat is TimeframeStats => stat !== null);
+  
+  console.log(`✅ Found ${stats.length} timeframes with data`);
   
   return stats.sort((a, b) => a.timeframe.localeCompare(b.timeframe));
 }
 
 export async function getTopPerformers(limit: number = 10): Promise<StrategyResult[]> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  console.log('🏆 Fetching top performers from all tables...');
+  console.log(`🏆 Fetching top ${limit} performers from ${UNIFIED_TABLE}...`);
   
-  const allResults: StrategyResult[] = [];
+  // Use pnl_numeric column for proper SQL sorting (after running migration)
+  const { data: results, error } = await supabase
+    .from(UNIFIED_TABLE)
+    .select('*')
+    .order('pnl_numeric', { ascending: false, nullsFirst: false })
+    .limit(limit);
   
-  for (const tableName of tableNames) {
-    // Fetch all results using pagination
-    let from = 0;
-    const pageSize = 1000;
-    
-    while (true) {
-      const { data: results, error } = await supabase
-        .from(tableName)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
-      
-      if (error) {
-        console.error(`❌ Error fetching from ${tableName}:`, error);
-        break;
-      }
-      
-      if (!results || results.length === 0) {
-        break;
-      }
-      
-      allResults.push(...(results as StrategyResult[]));
-      
-      if (results.length < pageSize) {
-        break;
-      }
-      
-      from += pageSize;
-    }
-    
-    console.log(`✅ Loaded results from ${tableName} for top performers`);
+  if (error) {
+    console.error(`❌ Error fetching top performers:`, error);
+    // Fallback to client-side sorting if pnl_numeric doesn't exist yet
+    return getTopPerformersFallback(limit);
   }
   
-  console.log(`📈 Total results collected for top performers: ${allResults.length}`);
+  console.log(`🎯 Returning top ${results?.length || 0} performers (best PnL: ${results?.[0]?.pnl || 'N/A'})`);
   
-  // Sort by PnL and return top performers
-  const sorted = allResults
-    .sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl))
-    .slice(0, limit);
-  
-  console.log(`🎯 Returning top ${sorted.length} performers`);
-  
-  return sorted;
+  return (results || []) as StrategyResult[];
 }
 
-export async function getResultsByTimeframe(timeframe: string): Promise<StrategyResult[]> {
+// Fallback function if pnl_numeric column doesn't exist yet
+async function getTopPerformersFallback(limit: number): Promise<StrategyResult[]> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  // Find all tables that match this timeframe
-  const matchingTables = tableNames.filter(tableName => {
-    // Extract timeframe from table name using same logic as getTimeframeStats
-    const timeframeMatch = tableName.match(/_(\d+h)_results$/);
-    if (timeframeMatch && timeframeMatch[1] === timeframe) {
-      return true;
-    }
-    if (tableName.includes('fixed_settings') && timeframe === 'fixed') {
-      return true;
-    }
-    if (tableName.includes('alex_settings') && timeframe === 'alex') {
-      return true;
-    }
-    if (tableName.includes('custom_settings') && timeframe === 'custom') {
-      return true;
-    }
-    if (tableName.endsWith('_settings')) {
-      const parts = tableName.split('_');
-      const extractedTf = parts[parts.length - 2];
-      if (extractedTf === timeframe) {
-        return true;
-      }
-    }
-    return false;
-  });
+  console.log(`⚠️ Using fallback method (pnl_numeric column may not exist yet)`);
   
-  console.log(`🔍 Found ${matchingTables.length} tables for timeframe ${timeframe}:`, matchingTables);
+  const tickers = await getUniqueTickers();
+  const allResults: StrategyResult[] = [];
   
-  const allResults: any[] = [];
-  
-  // Fetch from all matching tables
-  for (const tableName of matchingTables) {
-    let from = 0;
-    const pageSize = 1000;
-    
-    while (true) {
+  await Promise.all(
+    tickers.map(async (ticker) => {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(UNIFIED_TABLE)
         .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
+        .eq('ticker', ticker)
+        .limit(500);
       
-      if (error) {
-        console.error(`Error fetching results from ${tableName}:`, error);
-        break;
+      if (!error && data) {
+        allResults.push(...(data as StrategyResult[]));
       }
-      
-      if (!data || data.length === 0) {
-        break;
-      }
-      
-      allResults.push(...data);
-      
-      if (data.length < pageSize) {
-        break;
-      }
-      
-      from += pageSize;
-    }
-  }
+    })
+  );
   
-  console.log(`✅ Loaded ${allResults.length} results for timeframe ${timeframe}`);
-  
-  return allResults as StrategyResult[];
+  return allResults
+    .sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl))
+    .slice(0, limit);
 }
 
 export async function getTopPerformersByTimeframe(timeframe: string, limit: number = 20): Promise<StrategyResult[]> {
-  const allResults = await getResultsByTimeframe(timeframe);
+  const supabase = await createClient();
+  
+  console.log(`🔍 Fetching top ${limit} for timeframe ${timeframe}`);
+  
+  // Fetch a sample and sort client-side
+  const sampleSize = Math.max(limit * 25, 200);
+  
+  const { data, error } = await supabase
+    .from(UNIFIED_TABLE)
+    .select('*')
+    .eq('chart_tf', timeframe)
+    .limit(sampleSize);
+  
+  if (error) {
+    console.error(`Error fetching results from ${UNIFIED_TABLE}:`, error);
+    return [];
+  }
+  
+  if (!data || data.length === 0) {
+    return [];
+  }
   
   // Sort by profit factor (descending) and return top performers
-  const sorted = allResults
+  const sorted = (data as StrategyResult[])
     .sort((a, b) => {
       const pfA = parseFloat(a.profit_factor || '0');
       const pfB = parseFloat(b.profit_factor || '0');
@@ -370,119 +155,172 @@ export async function getTopPerformersByTimeframe(timeframe: string, limit: numb
     })
     .slice(0, limit);
   
-  console.log(`🎯 Returning top ${sorted.length} performers for ${timeframe} by profit factor`);
+  console.log(`🎯 Returning top ${sorted.length} performers for ${timeframe}`);
   
   return sorted;
 }
 
-export async function getAllResults(): Promise<StrategyResult[]> {
+export async function getTotalResultsCount(): Promise<number> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  console.log('📊 Fetching ALL results from all tables...');
+  console.log(`📊 Fetching count from ${UNIFIED_TABLE}...`);
   
-  const allResults: StrategyResult[] = [];
+  const { count, error } = await supabase
+    .from(UNIFIED_TABLE)
+    .select('*', { count: 'exact', head: true });
   
-  for (const tableName of tableNames) {
-    // Fetch all results using pagination
-    let from = 0;
-    const pageSize = 1000;
-    
-    while (true) {
-      const { data: results, error } = await supabase
-        .from(tableName)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
-      
-      if (error) {
-        console.error(`❌ Error fetching from ${tableName}:`, error);
-        break;
-      }
-      
-      if (!results || results.length === 0) {
-        break;
-      }
-      
-      allResults.push(...(results as StrategyResult[]));
-      
-      if (results.length < pageSize) {
-        break;
-      }
-      
-      from += pageSize;
-    }
-    
-    console.log(`✅ Loaded results from ${tableName}`);
+  if (error) {
+    console.error(`❌ Error fetching count from ${UNIFIED_TABLE}:`, error);
+    return 0;
   }
   
-  console.log(`📊 Total results from all databases: ${allResults.length}`);
+  console.log(`📊 Total results count: ${count}`);
   
-  return allResults;
+  return count || 0;
 }
 
 export async function getRecentResults(limit: number = 50): Promise<StrategyResult[]> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  console.log('📅 Fetching recent results from all tables...');
+  console.log(`📅 Fetching recent results from ${UNIFIED_TABLE}...`);
   
-  const allResults: StrategyResult[] = [];
+  const { data: results, error } = await supabase
+    .from(UNIFIED_TABLE)
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
   
-  for (const tableName of tableNames) {
-    const { data: results, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    
-    if (error) {
-      console.error(`❌ Error fetching from ${tableName}:`, error);
-    } else if (results) {
-      console.log(`✅ Loaded ${results.length} recent results from ${tableName}`);
-      allResults.push(...(results as StrategyResult[]));
-    }
+  if (error) {
+    console.error(`❌ Error fetching from ${UNIFIED_TABLE}:`, error);
+    return [];
   }
   
-  console.log(`📊 Total recent results: ${allResults.length}`);
+  console.log(`✨ Returning ${results?.length || 0} most recent results`);
   
-  // Sort by created_at and return most recent
-  const sorted = allResults
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, limit);
+  return (results || []) as StrategyResult[];
+}
+
+/**
+ * Get the best strategy for each coin + timeframe combination
+ * Best = Highest PnL with max drawdown <= 30%
+ * Uses pnl_numeric and max_dd_numeric columns for proper SQL sorting (after migration)
+ */
+export async function getBestStrategiesByCoinAndTimeframe(): Promise<CoinTimeframeBest[]> {
+  const supabase = await createClient();
   
-  console.log(`✨ Returning ${sorted.length} most recent results`);
+  console.log(`🎯 Fetching best strategies by coin and timeframe...`);
   
-  return sorted;
+  // Get all unique tickers first
+  const tickers = await getUniqueTickers();
+  const timeframes = ['2h', '3h', '4h', '5h', '6h', '8h', '12h', '1d'];
+  
+  const results: CoinTimeframeBest[] = [];
+  
+  // For each ticker + timeframe combination, find the best strategy
+  await Promise.all(
+    tickers.flatMap(ticker => 
+      timeframes.map(async (timeframe) => {
+        // Get count first
+        const { count } = await supabase
+          .from(UNIFIED_TABLE)
+          .select('*', { count: 'exact', head: true })
+          .eq('ticker', ticker)
+          .eq('chart_tf', timeframe);
+        
+        // Try to use SQL sorting with numeric columns (after migration)
+        // Filter: max_dd_numeric >= -30 (drawdown is negative, so -30% means abs <= 30)
+        const { data, error } = await supabase
+          .from(UNIFIED_TABLE)
+          .select('*')
+          .eq('ticker', ticker)
+          .eq('chart_tf', timeframe)
+          .gte('max_dd_numeric', -30) // max drawdown <= 30% (stored as negative)
+          .order('pnl_numeric', { ascending: false, nullsFirst: false })
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          // SQL query worked - use the result
+          results.push({
+            ticker,
+            timeframe,
+            best_strategy: data[0] as StrategyResult,
+            total_tested: count || 0,
+          });
+          return;
+        }
+        
+        // Fallback: fetch and filter client-side if numeric columns don't exist
+        const { data: fallbackData } = await supabase
+          .from(UNIFIED_TABLE)
+          .select('*')
+          .eq('ticker', ticker)
+          .eq('chart_tf', timeframe)
+          .limit(500);
+        
+        if (!fallbackData || fallbackData.length === 0) {
+          return;
+        }
+        
+        // Filter by max drawdown <= 30% and find highest PnL
+        let bestStrategy: StrategyResult | null = null;
+        let bestPnl = -Infinity;
+        
+        fallbackData.forEach((strategy: any) => {
+          const maxDD = Math.abs(parsePercentage(strategy.max_dd));
+          const pnl = parsePercentage(strategy.pnl);
+          
+          if (maxDD <= 30 && pnl > bestPnl) {
+            bestPnl = pnl;
+            bestStrategy = strategy as StrategyResult;
+          }
+        });
+        
+        results.push({
+          ticker,
+          timeframe,
+          best_strategy: bestStrategy,
+          total_tested: count || fallbackData.length,
+        });
+      })
+    )
+  );
+  
+  console.log(`✅ Found ${results.filter(r => r.best_strategy).length} best strategies across ${tickers.length} coins and ${timeframes.length} timeframes`);
+  
+  return results.sort((a, b) => {
+    // Sort by ticker first, then by timeframe
+    if (a.ticker !== b.ticker) return a.ticker.localeCompare(b.ticker);
+    return a.timeframe.localeCompare(b.timeframe);
+  });
 }
 
 export async function getUniqueTickers(): Promise<string[]> {
   const supabase = await createClient();
-  const tableNames = await getTableNames();
   
-  console.log('🎯 Fetching unique tickers from all tables...');
+  console.log(`🎯 Fetching unique tickers from ${UNIFIED_TABLE}...`);
   
-  const tickersSet = new Set<string>();
+  // Known tickers that we're testing - check which ones have data
+  const knownTickers = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'ADA/USDT', 'XRP/USDT', 'DOGE/USDT', 'AVAX/USDT', 'DOT/USDT', 'MATIC/USDT'];
   
-  for (const tableName of tableNames) {
-    const { data: results, error } = await supabase
-      .from(tableName)
-      .select('ticker')
-      .limit(1000);
-    
-    if (error) {
-      console.error(`❌ Error fetching tickers from ${tableName}:`, error);
-    } else if (results) {
-      results.forEach((result: any) => {
-        if (result.ticker) {
-          tickersSet.add(result.ticker);
-        }
-      });
-    }
-  }
+  const tickersWithData: string[] = [];
   
-  const tickers = Array.from(tickersSet).sort();
-  console.log(`✅ Found ${tickers.length} unique tickers:`, tickers);
+  // Check each known ticker for existence
+  await Promise.all(
+    knownTickers.map(async (ticker) => {
+      const { count, error } = await supabase
+        .from(UNIFIED_TABLE)
+        .select('*', { count: 'exact', head: true })
+        .eq('ticker', ticker);
+      
+      if (!error && count && count > 0) {
+        tickersWithData.push(ticker);
+        console.log(`  ✓ ${ticker}: ${count} records`);
+      }
+    })
+  );
+  
+  const tickers = tickersWithData.sort();
+  console.log(`✅ Found ${tickers.length} tickers with data:`, tickers);
   
   return tickers;
 }

@@ -11,40 +11,31 @@ export const dynamic = 'force-dynamic';
 async function getStrategyById(id: string, ticker?: string, timeframe?: string): Promise<StrategyResult | null> {
   const supabase = await createClient();
   
-  // Import the dynamic table discovery function
-  const { getTableNames } = await import("@/lib/supabase/queries");
-  const tableNames = await getTableNames();
+  console.log('🔍 Searching for strategy:', { id, ticker, timeframe });
   
-  console.log('🔍 Searching for strategy:', { id, ticker, timeframe, tables: tableNames });
+  // Query the unified table directly
+  let query = supabase
+    .from('trading_results_unified')
+    .select('*')
+    .eq('id', id);
   
-  // Search each table for the strategy
-  for (const tableName of tableNames) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (data && !error) {
-      // If ticker and timeframe are provided, verify they match
-      if (ticker && timeframe) {
-        if (data.ticker === ticker && data.chart_tf === timeframe) {
-          console.log('✅ Found matching strategy in table:', tableName);
-          return data as StrategyResult;
-        } else {
-          console.log('⚠️ Found ID in', tableName, 'but ticker/timeframe mismatch. Continuing search...');
-          continue;
-        }
-      } else {
-        // No filter provided, return first match
-        console.log('✅ Found strategy in table:', tableName);
-        return data as StrategyResult;
-      }
-    }
+  // Add optional filters if provided
+  if (ticker) {
+    query = query.eq('ticker', ticker);
+  }
+  if (timeframe) {
+    query = query.eq('chart_tf', timeframe);
   }
   
-  console.log('❌ Strategy not found in any table');
-  return null;
+  const { data, error } = await query.single();
+  
+  if (error || !data) {
+    console.log('❌ Strategy not found:', error?.message);
+    return null;
+  }
+  
+  console.log('✅ Found strategy:', { id: data.id, ticker: data.ticker, chart_tf: data.chart_tf });
+  return data as StrategyResult;
 }
 
 export default async function StrategyDetailPage({ 

@@ -7,7 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { StrategyResult } from "@/lib/supabase/queries";
+import { StrategyResult } from "@/lib/types/strategy";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 

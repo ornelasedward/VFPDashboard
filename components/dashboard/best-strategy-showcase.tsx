@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { StrategyResult } from "@/lib/supabase/queries";
+import { StrategyResult } from "@/lib/types/strategy";
 import { TrendingUp, Target, BarChart3, Percent, DollarSign, Award } from "lucide-react";
 import Link from "next/link";
 

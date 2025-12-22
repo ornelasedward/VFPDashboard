@@ -1,35 +1,23 @@
 import { Suspense } from "react";
-import { getTimeframeStats, getTopPerformers, getAllResults, getTopPerformersByTimeframe, getUniqueTickers } from "@/lib/supabase/queries";
+import { getTopPerformers, getTotalResultsCount, getUniqueTickers, getBestStrategiesByCoinAndTimeframe } from "@/lib/supabase/queries";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { Activity } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/nav";
 
 async function DashboardContent() {
-  const [timeframeStats, topPerformers, allResults, availableTickers] = await Promise.all([
-    getTimeframeStats(),
-    getTopPerformers(20),
-    getAllResults(),
+  const [topPerformers, totalCount, availableTickers, coinTimeframeMatrix] = await Promise.all([
+    getTopPerformers(500),
+    getTotalResultsCount(),
     getUniqueTickers(),
+    getBestStrategiesByCoinAndTimeframe(),
   ]);
-  
-  // Extract unique timeframes from the stats (dynamically discovered)
-  const uniqueTimeframes = timeframeStats.map(stat => stat.timeframe);
-  
-  // Fetch top 20 performers for each discovered timeframe
-  const timeframeTopPerformers = await Promise.all(
-    uniqueTimeframes.map(async (tf) => ({
-      timeframe: tf,
-      results: await getTopPerformersByTimeframe(tf, 20)
-    }))
-  );
 
   return (
     <DashboardClient
-      timeframeStats={timeframeStats}
       topPerformers={topPerformers}
-      allResults={allResults}
-      timeframeTopPerformers={timeframeTopPerformers}
+      totalCount={totalCount}
       availableTickers={availableTickers}
+      coinTimeframeMatrix={coinTimeframeMatrix}
     />
   );
 }

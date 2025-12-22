@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StrategyResult } from "@/lib/supabase/queries";
+import { StrategyResult } from "@/lib/types/strategy";
 import { Activity, TrendingUp, Target, BarChart3, Percent, DollarSign, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";

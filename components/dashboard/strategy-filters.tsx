@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,12 +13,14 @@ export interface StrategyFilters {
   maxPnl: number;
   minWinRate: number;
   ticker: string | null;
+  timeframe: string | null;
 }
 
 interface StrategyFiltersProps {
   filters: StrategyFilters;
   onFiltersChange: (filters: StrategyFilters) => void;
   availableTickers: string[];
+  availableTimeframes: string[];
 }
 
 const DEFAULT_FILTERS: StrategyFilters = {
@@ -28,9 +29,10 @@ const DEFAULT_FILTERS: StrategyFilters = {
   maxPnl: 1000000,
   minWinRate: 0,
   ticker: null,
+  timeframe: null,
 };
 
-export function StrategyFiltersComponent({ filters, onFiltersChange, availableTickers }: StrategyFiltersProps) {
+export function StrategyFiltersComponent({ filters, onFiltersChange, availableTickers, availableTimeframes }: StrategyFiltersProps) {
   // Local state for editing
   const [localFilters, setLocalFilters] = useState<StrategyFilters>(filters);
   const [hasChanges, setHasChanges] = useState(false);
@@ -48,7 +50,8 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
       localFilters.minPnl !== filters.minPnl ||
       localFilters.maxPnl !== filters.maxPnl ||
       localFilters.minWinRate !== filters.minWinRate ||
-      localFilters.ticker !== filters.ticker;
+      localFilters.ticker !== filters.ticker ||
+      localFilters.timeframe !== filters.timeframe;
     setHasChanges(changed);
   }, [localFilters, filters]);
 
@@ -64,40 +67,35 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
   const isFiltered = 
     filters.maxDrawdown !== 100 ||
     filters.minPnl !== -100 ||
-    filters.maxPnl !== 10000 ||
+    filters.maxPnl !== 1000000 ||
     filters.minWinRate !== 0 ||
-    filters.ticker !== null;
+    filters.ticker !== null ||
+    filters.timeframe !== null;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            <CardTitle>Strategy Filters</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            {hasChanges && (
-              <Button variant="default" size="sm" onClick={handleApply}>
-                <Check className="h-4 w-4 mr-1" />
-                Apply Filters
-              </Button>
-            )}
-            {isFiltered && (
-              <Button variant="outline" size="sm" onClick={handleReset}>
-                <X className="h-4 w-4 mr-1" />
-                Reset
-              </Button>
-            )}
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Filters</span>
+          {hasChanges && <span className="text-xs text-orange-600">• Changes not applied</span>}
         </div>
-        <CardDescription>
-          Filter strategies by risk tolerance and performance metrics
-          {hasChanges && <span className="text-orange-600 ml-2">• Changes not applied</span>}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <Button variant="default" size="sm" onClick={handleApply}>
+              <Check className="h-4 w-4 mr-1" />
+              Apply
+            </Button>
+          )}
+          {isFiltered && (
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <X className="h-4 w-4 mr-1" />
+              Reset
+            </Button>
+          )}
+        </div>
+      </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-6">
           {/* Ticker Filter */}
           <div className="space-y-2">
             <Label htmlFor="ticker-filter">Ticker</Label>
@@ -115,6 +113,29 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
                 {availableTickers.map((ticker) => (
                   <SelectItem key={ticker} value={ticker}>
                     {ticker}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Timeframe Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="timeframe-filter">Timeframe</Label>
+            <Select
+              value={localFilters.timeframe || "all"}
+              onValueChange={(value) => 
+                setLocalFilters({ ...localFilters, timeframe: value === "all" ? null : value })
+              }
+            >
+              <SelectTrigger id="timeframe-filter">
+                <SelectValue placeholder="All Timeframes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Timeframes</SelectItem>
+                {availableTimeframes.map((tf) => (
+                  <SelectItem key={tf} value={tf}>
+                    {tf.toUpperCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -206,7 +227,6 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
   );
 }

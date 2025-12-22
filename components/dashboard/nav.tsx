@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Activity } from "lucide-react";
 
 export function DashboardNav() {
   return (
@@ -14,6 +14,10 @@ export function DashboardNav() {
         </div>
         
         <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-green-500 animate-pulse" />
+          <span className="text-sm text-muted-foreground">Live Data</span>
+        </div>
           <ThemeSwitcher />
         </div>
       </div>
