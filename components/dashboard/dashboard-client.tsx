@@ -59,6 +59,12 @@ export function DashboardClient({
 
   const filteredTopPerformers = applyFilters(topPerformers);
   
+  // Filter matrix data based on ticker/timeframe filters
+  const filteredMatrix = coinTimeframeMatrix.filter(item => {
+    if (filters.ticker && item.ticker !== filters.ticker) return false;
+    if (filters.timeframe && item.timeframe !== filters.timeframe) return false;
+    return true;
+  });
   
   return (
     <div className="space-y-8">
@@ -68,12 +74,35 @@ export function DashboardClient({
         <OverviewStats results={filteredTopPerformers} totalCount={totalCount} />
       </section>
 
-      {/* Coin/Timeframe Matrix - Best strategies with DD <= 30% */}
+      {/* Filters - affects both matrix and table */}
       <section>
-        <CoinTimeframeMatrix data={coinTimeframeMatrix} />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Strategy Filters
+            </CardTitle>
+            <CardDescription>
+              Filter strategies by performance metrics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StrategyFiltersComponent
+              filters={filters}
+              onFiltersChange={setFilters}
+              availableTickers={availableTickers}
+              availableTimeframes={availableTimeframes}
+            />
+          </CardContent>
+        </Card>
       </section>
 
-      {/* Top Performers Table with Filters */}
+      {/* Coin/Timeframe Matrix - Best strategies with DD <= 30% */}
+      <section>
+        <CoinTimeframeMatrix data={filteredMatrix} />
+      </section>
+
+      {/* Top Performers Table */}
       <section>
         <Card>
           <CardHeader>
@@ -82,21 +111,15 @@ export function DashboardClient({
               Top Performing Strategies
             </CardTitle>
             <CardDescription>
-              Filter and explore strategies by performance metrics
+              Strategies ranked by PnL. Use filters above to refine results.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <StrategyFiltersComponent
-              filters={filters}
-              onFiltersChange={setFilters}
-              availableTickers={availableTickers}
-              availableTimeframes={availableTimeframes}
-            />
+          <CardContent>
             <TopPerformersTable results={filteredTopPerformers} />
           </CardContent>
         </Card>
       </section>
 
-          </div>
+    </div>
   );
 }

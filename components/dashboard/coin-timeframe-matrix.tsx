@@ -48,7 +48,7 @@ export function CoinTimeframeMatrix({ data }: CoinTimeframeMatrixProps) {
           Best Strategy by Coin & Timeframe
         </CardTitle>
         <CardDescription>
-          Highest PnL strategies with max drawdown ≤ 30%. Click any cell to view details.
+          Highest PnL strategy for each coin/timeframe. Click any cell to view details.
         </CardDescription>
       </CardHeader>
       <CardContent>

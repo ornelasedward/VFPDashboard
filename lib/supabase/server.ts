@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 /**
@@ -30,5 +31,16 @@ export async function createClient() {
         },
       },
     },
+  );
+}
+
+/**
+ * Creates a Supabase client without cookies - for use in cached functions
+ * where cookies() cannot be called. Uses the anon key for read-only access.
+ */
+export function createCacheableClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   );
 }
