@@ -12,8 +12,11 @@ export interface StrategyFilters {
   minPnl: number;
   maxPnl: number;
   minWinRate: number;
+  minProfitFactor: number;
+  minTrades: number;
   ticker: string | null;
   timeframe: string | null;
+  vmId: string | null;
 }
 
 interface StrategyFiltersProps {
@@ -21,6 +24,7 @@ interface StrategyFiltersProps {
   onFiltersChange: (filters: StrategyFilters) => void;
   availableTickers: string[];
   availableTimeframes: string[];
+  availableVmIds: string[];
 }
 
 const DEFAULT_FILTERS: StrategyFilters = {
@@ -28,11 +32,14 @@ const DEFAULT_FILTERS: StrategyFilters = {
   minPnl: -100,
   maxPnl: 1000000,
   minWinRate: 0,
+  minProfitFactor: 0,
+  minTrades: 0,
   ticker: null,
   timeframe: null,
+  vmId: null,
 };
 
-export function StrategyFiltersComponent({ filters, onFiltersChange, availableTickers, availableTimeframes }: StrategyFiltersProps) {
+export function StrategyFiltersComponent({ filters, onFiltersChange, availableTickers, availableTimeframes, availableVmIds }: StrategyFiltersProps) {
   // Local state for editing
   const [localFilters, setLocalFilters] = useState<StrategyFilters>(filters);
   const [hasChanges, setHasChanges] = useState(false);
@@ -50,8 +57,11 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
       localFilters.minPnl !== filters.minPnl ||
       localFilters.maxPnl !== filters.maxPnl ||
       localFilters.minWinRate !== filters.minWinRate ||
+      localFilters.minProfitFactor !== filters.minProfitFactor ||
+      localFilters.minTrades !== filters.minTrades ||
       localFilters.ticker !== filters.ticker ||
-      localFilters.timeframe !== filters.timeframe;
+      localFilters.timeframe !== filters.timeframe ||
+      localFilters.vmId !== filters.vmId;
     setHasChanges(changed);
   }, [localFilters, filters]);
 
@@ -69,8 +79,11 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
     filters.minPnl !== -100 ||
     filters.maxPnl !== 1000000 ||
     filters.minWinRate !== 0 ||
+    filters.minProfitFactor !== 0 ||
+    filters.minTrades !== 0 ||
     filters.ticker !== null ||
-    filters.timeframe !== null;
+    filters.timeframe !== null ||
+    filters.vmId !== null;
 
   return (
     <div className="space-y-4">
@@ -136,6 +149,29 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
                 {availableTimeframes.map((tf) => (
                   <SelectItem key={tf} value={tf}>
                     {tf.toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* VM ID Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="vmid-filter">VM ID</Label>
+            <Select
+              value={localFilters.vmId || "all"}
+              onValueChange={(value) => 
+                setLocalFilters({ ...localFilters, vmId: value === "all" ? null : value })
+              }
+            >
+              <SelectTrigger id="vmid-filter">
+                <SelectValue placeholder="All VMs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All VMs</SelectItem>
+                {availableVmIds.map((vmId) => (
+                  <SelectItem key={vmId} value={vmId}>
+                    {vmId}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -224,6 +260,46 @@ export function StrategyFiltersComponent({ filters, onFiltersChange, availableTi
             />
             <p className="text-xs text-muted-foreground">
               Show strategies ≥ {localFilters.minWinRate}%
+            </p>
+          </div>
+
+          {/* Min Profit Factor Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="min-profit-factor">Min Profit Factor</Label>
+            <Input
+              id="min-profit-factor"
+              type="number"
+              min="0"
+              step="0.1"
+              value={localFilters.minProfitFactor === 0 ? "" : localFilters.minProfitFactor}
+              onChange={(e) => {
+                const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                setLocalFilters({ ...localFilters, minProfitFactor: isNaN(val) ? 0 : val });
+              }}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Show strategies ≥ {localFilters.minProfitFactor}
+            </p>
+          </div>
+
+          {/* Min Trades Filter */}
+          <div className="space-y-2">
+            <Label htmlFor="min-trades">Min Trades</Label>
+            <Input
+              id="min-trades"
+              type="number"
+              min="0"
+              step="10"
+              value={localFilters.minTrades === 0 ? "" : localFilters.minTrades}
+              onChange={(e) => {
+                const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+                setLocalFilters({ ...localFilters, minTrades: isNaN(val) ? 0 : val });
+              }}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Show strategies ≥ {localFilters.minTrades} trades
             </p>
           </div>
         </div>

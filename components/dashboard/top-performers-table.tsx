@@ -31,6 +31,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
           <TableRow>
             <TableHead className="w-[50px]">Rank</TableHead>
             <TableHead>Ticker</TableHead>
+            <TableHead>VM ID</TableHead>
             <TableHead>Timeframe</TableHead>
             <TableHead>PnL</TableHead>
             <TableHead>Win Rate</TableHead>
@@ -47,7 +48,7 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
         <TableBody>
           {results.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={13} className="text-center text-muted-foreground">
+              <TableCell colSpan={14} className="text-center text-muted-foreground">
                 No results found
               </TableCell>
             </TableRow>
@@ -72,6 +73,11 @@ export function TopPerformersTable({ results }: TopPerformersTableProps) {
                   <TableCell>
                     <Link href={strategyLink} className="block">
                       <Badge variant="default" className="font-semibold">{result.ticker}</Badge>
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Link href={strategyLink} className="block">
+                      <Badge variant="outline" className="text-xs">{result.vm_id || 'N/A'}</Badge>
                     </Link>
                   </TableCell>
                   <TableCell>

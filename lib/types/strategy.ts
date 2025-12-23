@@ -1,6 +1,7 @@
 export interface StrategyResult {
   id: number;
   created_at: string;
+  vm_id: string;
   ticker: string;
   exchange: string;
   date_start: string;

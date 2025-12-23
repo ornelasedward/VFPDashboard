@@ -216,6 +216,10 @@ export default async function StrategyDetailPage({
                         <p className="text-lg font-semibold">{strategy.ticker}</p>
                       </div>
                       <div>
+                        <p className="text-sm font-medium text-muted-foreground">VM ID</p>
+                        <p className="text-lg font-semibold">{strategy.vm_id || 'N/A'}</p>
+                      </div>
+                      <div>
                         <p className="text-sm font-medium text-muted-foreground">Exchange</p>
                         <p className="text-lg font-semibold">{strategy.exchange}</p>
                       </div>
