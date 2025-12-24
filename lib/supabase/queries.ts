@@ -7,8 +7,9 @@ import { unstable_cache } from "next/cache";
 export { parsePercentage };
 export type { StrategyResult, TimeframeStats, CoinTimeframeBest };
 
-// Unified table name
+// Table names
 const UNIFIED_TABLE = 'trading_results_unified';
+const TOP_TABLE = 'trading_results_unified_top'; // Pre-filtered: profit_factor >= 2.2 (~6,800 rows)
 
 // Cache duration in seconds (1 hour = 3600 seconds)
 const CACHE_DURATION = 3600;
@@ -76,70 +77,43 @@ export async function getTimeframeStats(): Promise<TimeframeStats[]> {
   return stats.sort((a, b) => a.timeframe.localeCompare(b.timeframe));
 }
 
-// Cached version of getTopPerformers - caches for 1 hour
-export const getTopPerformers = unstable_cache(
-  async (limit: number = 10): Promise<StrategyResult[]> => {
-    console.log(`🏆 Fetching top ${limit} performers (will be cached for ${CACHE_DURATION}s)...`);
-    return getTopPerformersUncached(limit);
-  },
-  ['top-performers'],
-  { revalidate: CACHE_DURATION, tags: ['strategies'] }
-);
+// Only fetch fields needed for table display and filtering
+const TABLE_FIELDS = 'id,vm_id,ticker,chart_tf,pnl,win_rate,profit_factor,max_dd,trades,lookback,primary_speed,secondary_speed,smoothing_type,trend_type';
 
-// Uncached implementation
-async function getTopPerformersUncached(limit: number = 10): Promise<StrategyResult[]> {
-  return getTopPerformersFallback(limit);
-}
-
-// Fetches ALL data by ticker+timeframe using pagination to ensure we find the true best
-async function getTopPerformersFallback(limit: number): Promise<StrategyResult[]> {
+// Fetches all top performers from the pre-filtered TOP_TABLE (~6,800 rows)
+export async function getTopPerformers(): Promise<StrategyResult[]> {
   const supabase = createCacheableClient();
   
-  console.log(`🔄 Fetching all strategies with pagination for accurate results...`);
+  console.log(`🏆 Fetching all performers from ${TOP_TABLE}...`);
   
-  const tickers = await getUniqueTickersUncached();
-  const timeframes = ['2h', '3h', '4h', '5h', '6h', '8h', '12h', '1d'];
   const allResults: StrategyResult[] = [];
+  let offset = 0;
+  const pageSize = 1000;
   
-  // Fetch by ticker+timeframe combination with pagination
-  await Promise.all(
-    tickers.flatMap(ticker => 
-      timeframes.map(async (timeframe) => {
-        let allData: any[] = [];
-        let offset = 0;
-        const pageSize = 10000;
-        let hasMore = true;
-        
-        // Paginate through all rows for this ticker/timeframe
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from(UNIFIED_TABLE)
-            .select('*')
-            .eq('ticker', ticker)
-            .eq('chart_tf', timeframe)
-            .range(offset, offset + pageSize - 1);
-          
-          if (error || !data || data.length === 0) {
-            hasMore = false;
-          } else {
-            allData = allData.concat(data);
-            offset += pageSize;
-            hasMore = data.length === pageSize;
-          }
-        }
-        
-        // Add all strategies to results (no DD filter - let UI filters handle that)
-        allData.forEach((strategy: any) => {
-          allResults.push(strategy as StrategyResult);
-        });
-      })
-    )
-  );
+  // Fetch all rows from the pre-filtered table
+  while (true) {
+    const { data, error } = await supabase
+      .from(TOP_TABLE)
+      .select(TABLE_FIELDS)
+      .range(offset, offset + pageSize - 1);
+    
+    if (error) {
+      console.error(`Error fetching data:`, error.message);
+      break;
+    } else if (!data || data.length === 0) {
+      break;
+    } else {
+      allResults.push(...(data as StrategyResult[]));
+      offset += pageSize;
+      
+      if (data.length < pageSize) break; // No more data
+    }
+  }
   
-  // Sort by PnL descending and return top results
-  return allResults
-    .sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl))
-    .slice(0, limit);
+  console.log(`📊 Total strategies fetched: ${allResults.length}`);
+  
+  // Sort by PnL descending
+  return allResults.sort((a, b) => parsePercentage(b.pnl) - parsePercentage(a.pnl));
 }
 
 export async function getTopPerformersByTimeframe(timeframe: string, limit: number = 20): Promise<StrategyResult[]> {
@@ -182,14 +156,14 @@ export async function getTopPerformersByTimeframe(timeframe: string, limit: numb
 export async function getTotalResultsCount(): Promise<number> {
   const supabase = await createClient();
   
-  console.log(`📊 Fetching count from ${UNIFIED_TABLE}...`);
+  console.log(`📊 Fetching count from ${TOP_TABLE}...`);
   
   const { count, error } = await supabase
-    .from(UNIFIED_TABLE)
+    .from(TOP_TABLE)
     .select('*', { count: 'exact', head: true });
   
   if (error) {
-    console.error(`❌ Error fetching count from ${UNIFIED_TABLE}:`, error);
+    console.error(`❌ Error fetching count from ${TOP_TABLE}:`, error);
     return 0;
   }
   
@@ -220,95 +194,41 @@ export async function getRecentResults(limit: number = 50): Promise<StrategyResu
 }
 
 /**
- * Get the best strategy for each coin + timeframe combination
- * Best = Highest PnL with max drawdown <= 30%
- * Cached for 1 hour to avoid re-fetching all data on every render
+ * Compute best strategy for each coin + timeframe from already-fetched data
+ * This avoids duplicate DB calls - just processes the data in memory
  */
-export const getBestStrategiesByCoinAndTimeframe = unstable_cache(
-  async (): Promise<CoinTimeframeBest[]> => {
-    console.log(`🎯 Fetching best strategies by coin and timeframe (will be cached for ${CACHE_DURATION}s)...`);
-    return getBestStrategiesByCoinAndTimeframeUncached();
-  },
-  ['best-strategies-matrix'],
-  { revalidate: CACHE_DURATION, tags: ['strategies'] }
-);
-
-// Uncached implementation
-async function getBestStrategiesByCoinAndTimeframeUncached(): Promise<CoinTimeframeBest[]> {
-  const supabase = createCacheableClient();
-  
-  // Get all unique tickers first
-  const tickers = await getUniqueTickersUncached();
+export function computeBestStrategiesFromData(allStrategies: StrategyResult[]): CoinTimeframeBest[] {
+  const tickers = [...new Set(allStrategies.map(s => s.ticker))].sort();
   const timeframes = ['2h', '3h', '4h', '5h', '6h', '8h', '12h', '1d'];
   
   const results: CoinTimeframeBest[] = [];
   
-  // For each ticker + timeframe combination, find the best strategy using string parsing
-  // This ensures consistency with getTopPerformers query
-  await Promise.all(
-    tickers.flatMap(ticker => 
-      timeframes.map(async (timeframe) => {
-        // Get count first
-        const { count } = await supabase
-          .from(UNIFIED_TABLE)
-          .select('*', { count: 'exact', head: true })
-          .eq('ticker', ticker)
-          .eq('chart_tf', timeframe);
-        
-        // Fetch ALL data for this ticker/timeframe using pagination
-        let allData: any[] = [];
-        let offset = 0;
-        const pageSize = 10000;
-        let hasMore = true;
-        
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from(UNIFIED_TABLE)
-            .select('*')
-            .eq('ticker', ticker)
-            .eq('chart_tf', timeframe)
-            .range(offset, offset + pageSize - 1);
-          
-          if (error || !data || data.length === 0) {
-            hasMore = false;
-          } else {
-            allData = allData.concat(data);
-            offset += pageSize;
-            hasMore = data.length === pageSize;
-          }
+  for (const ticker of tickers) {
+    for (const timeframe of timeframes) {
+      const strategies = allStrategies.filter(s => s.ticker === ticker && s.chart_tf === timeframe);
+      
+      if (strategies.length === 0) {
+        results.push({ ticker, timeframe, best_strategy: null, total_tested: 0 });
+        continue;
+      }
+      
+      // Find highest PnL
+      let bestStrategy: StrategyResult | null = null;
+      let bestPnl = -Infinity;
+      
+      strategies.forEach(strategy => {
+        const pnl = parsePercentage(strategy.pnl);
+        if (pnl > bestPnl) {
+          bestPnl = pnl;
+          bestStrategy = strategy;
         }
-        
-        if (allData.length === 0) {
-          return;
-        }
-        
-        // Find highest PnL strategy (no DD filter - let UI filters handle that)
-        let bestStrategy: StrategyResult | null = null;
-        let bestPnl = -Infinity;
-        
-        allData.forEach((strategy: any) => {
-          const pnl = parsePercentage(strategy.pnl);
-          
-          if (pnl > bestPnl) {
-            bestPnl = pnl;
-            bestStrategy = strategy as StrategyResult;
-          }
-        });
-        
-        results.push({
-          ticker,
-          timeframe,
-          best_strategy: bestStrategy,
-          total_tested: count || allData.length,
-        });
-      })
-    )
-  );
-  
-  console.log(`✅ Found ${results.filter(r => r.best_strategy).length} best strategies across ${tickers.length} coins and ${timeframes.length} timeframes`);
+      });
+      
+      results.push({ ticker, timeframe, best_strategy: bestStrategy, total_tested: strategies.length });
+    }
+  }
   
   return results.sort((a, b) => {
-    // Sort by ticker first, then by timeframe
     if (a.ticker !== b.ticker) return a.ticker.localeCompare(b.ticker);
     return a.timeframe.localeCompare(b.timeframe);
   });

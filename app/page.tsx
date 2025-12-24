@@ -1,16 +1,19 @@
 import { Suspense } from "react";
-import { getTopPerformers, getTotalResultsCount, getUniqueTickers, getBestStrategiesByCoinAndTimeframe } from "@/lib/supabase/queries";
+import { getTopPerformers, getTotalResultsCount, getUniqueTickers, computeBestStrategiesFromData } from "@/lib/supabase/queries";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { Activity } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/nav";
 
 async function DashboardContent() {
-  const [topPerformers, totalCount, availableTickers, coinTimeframeMatrix] = await Promise.all([
-    getTopPerformers(500),
+  // Fetch data - topPerformers is the main data source
+  const [topPerformers, totalCount] = await Promise.all([
+    getTopPerformers(),
     getTotalResultsCount(),
-    getUniqueTickers(),
-    getBestStrategiesByCoinAndTimeframe(),
   ]);
+
+  // Compute matrix from already-fetched data (no extra DB calls)
+  const coinTimeframeMatrix = computeBestStrategiesFromData(topPerformers);
+  const availableTickers = [...new Set(topPerformers.map(s => s.ticker))].sort();
 
   return (
     <DashboardClient
